@@ -1,0 +1,96 @@
+import {usePage} from '@inertiajs/react';
+import type {SharedData} from '@/types';
+
+const en={
+title:'Audit & Security',description:'Review administrative activity, inspect changes, and monitor security events.',
+export:'Export CSV',refresh:'Refresh',refreshed:'Activity refreshed',error:'Activity could not be loaded. Please try again.',
+total:'Total Events',successful:'Successful',failed:'Failed or Blocked',sensitive:'Sensitive Changes',
+selected:'Selected period',ofEvents:'of events',inPeriod:'In this period',all:'All Activity',accounts:'Accounts & Access',
+packages:'Packages & Subscriptions',payments:'Payments & Refunds',settings:'System Settings',security:'Security Events',operations:'Operations',
+search:'Search actor, customer, record ID or event ID…',actor:'Actor',result:'Result',period:'Period',sort:'Sort',any:'All',
+admin:'Administrator',customer:'Customer',system:'System',unknown:'Unknown',success:'Success',blocked:'Blocked',failure:'Failed',
+newest:'Newest',oldest:'Oldest',allDates:'All Time',day:'Last 24 Hours',week:'Last 7 Days',month:'Last 30 Days',custom:'Custom Range',
+from:'From',to:'To',clear:'Clear Filters',date:'Date & Time',action:'Action / Event',target:'Target / Details',ip:'IP Address',
+actions:'Actions',view:'View event details',empty:'No activity recorded',noMatch:'No events match your filters.',
+emptyHint:'Recorded administrative and security events will appear here.',showing:'Showing',of:'of',events:'events',previous:'Previous page',next:'Next page',
+details:'Event Details',summary:'Event Summary',context:'Security Context',changes:'Recorded Changes',reason:'Reason',
+field:'Field',before:'Before',after:'After',noChanges:'Before and after values were not recorded for this event.',
+recordedFields:'Changed fields',source:'Source',sourceId:'Source record',browser:'Browser',request:'Request ID',
+masked:'IP addresses are masked. Unrecorded context is shown as —.',readOnly:'Read-only journal · credentials and receipt contents are excluded.',
+close:'Close',related:'Open related record',unavailable:'No related record is available.',exported:'CSV export started',
+exportError:'CSV could not be exported.',stale:'The last loaded results are shown. Refresh to try again.',
+utc:'Custom date ranges use UTC.',copied:'Copied',copy:'Copy event ID',noValue:'Not recorded',sensitiveOnly:'Sensitive only',
+recorded:'Recorded at',origin:'Original records',historyHint:'Older records may not include security context or before and after values.',
+};
+const my:Partial<Record<keyof typeof en,string>>={
+title:'စစ်ဆေးမှတ်တမ်းနှင့် လုံခြုံရေး',description:'စီမံခန့်ခွဲမှု၊ ပြောင်းလဲမှုနှင့် လုံခြုံရေးဖြစ်စဉ်များကို စစ်ဆေးပါ။',
+export:'CSV ထုတ်ယူရန်',refresh:'ပြန်ဖတ်ရန်',refreshed:'မှတ်တမ်းများ ပြန်ဖတ်ပြီးပါပြီ',error:'မှတ်တမ်းများ ဖတ်မရပါ။ ပြန်ကြိုးစားပါ။',
+total:'ဖြစ်စဉ် စုစုပေါင်း',successful:'အောင်မြင်မှု',failed:'မအောင်မြင် / တားဆီးမှု',sensitive:'အရေးကြီး ပြောင်းလဲမှု',
+selected:'ရွေးထားသောကာလ',ofEvents:'ဖြစ်စဉ်များ၏',inPeriod:'ဤကာလအတွင်း',all:'မှတ်တမ်းအားလုံး',accounts:'အကောင့်နှင့် ဝင်ရောက်ခွင့်',
+packages:'ပက်ကေ့ချ်နှင့် အဖွဲ့ဝင်',payments:'ပေးချေမှုနှင့် ပြန်အမ်းမှု',settings:'စနစ် သတ်မှတ်ချက်',security:'လုံခြုံရေး ဖြစ်စဉ်',operations:'လုပ်ငန်းလည်ပတ်မှု',
+search:'စီမံသူ၊ အသုံးပြုသူ၊ မှတ်တမ်း ID ဖြင့် ရှာရန်…',actor:'လုပ်ဆောင်သူ',result:'ရလဒ်',period:'ကာလ',sort:'စီရန်',any:'အားလုံး',
+admin:'စီမံခန့်ခွဲသူ',customer:'အသုံးပြုသူ',system:'စနစ်',unknown:'မသိရှိရ',success:'အောင်မြင်',blocked:'တားဆီးထား',failure:'မအောင်မြင်',
+newest:'နောက်ဆုံးမှ',oldest:'အဟောင်းမှ',allDates:'အချိန်အားလုံး',day:'နောက်ဆုံး ၂၄ နာရီ',week:'နောက်ဆုံး ၇ ရက်',month:'နောက်ဆုံး ရက် ၃၀',custom:'ကာလရွေးရန်',
+from:'စရက်',to:'ဆုံးရက်',clear:'စစ်ထုတ်မှု ရှင်းရန်',date:'နေ့ရက်နှင့် အချိန်',action:'လုပ်ဆောင်မှု / ဖြစ်စဉ်',target:'သက်ဆိုင်ရာ / အသေးစိတ်',ip:'IP လိပ်စာ',
+actions:'လုပ်ဆောင်ရန်',view:'အသေးစိတ်ကြည့်ရန်',empty:'မှတ်တမ်း မရှိသေးပါ',noMatch:'ကိုက်ညီသည့် မှတ်တမ်း မရှိပါ',
+emptyHint:'လုပ်ဆောင်မှုနှင့် လုံခြုံရေးမှတ်တမ်းများကို ဤနေရာတွင် ပြပါမည်။',showing:'ပြသမှု',of:'/',events:'မှတ်တမ်း',previous:'ရှေ့စာမျက်နှာ',next:'နောက်စာမျက်နှာ',
+details:'ဖြစ်စဉ် အသေးစိတ်',summary:'ဖြစ်စဉ် အကျဉ်း',context:'လုံခြုံရေး အချက်အလက်',changes:'ပြောင်းလဲမှု မှတ်တမ်း',reason:'အကြောင်းပြချက်',
+field:'အချက်အလက်',before:'မပြောင်းမီ',after:'ပြောင်းပြီး',noChanges:'ဤဖြစ်စဉ်အတွက် မပြောင်းမီ / ပြောင်းပြီး တန်ဖိုးများ မမှတ်တမ်းတင်ထားပါ။',
+recordedFields:'ပြောင်းထားသော အချက်များ',source:'ရင်းမြစ်',sourceId:'မူရင်း မှတ်တမ်း',browser:'ဘရောက်ဇာ',request:'တောင်းဆိုမှု ID',
+masked:'IP အချို့ကို ဖုံးထားပါသည်။ မမှတ်တမ်းတင်ထားသော အချက်များကို — ဖြင့်ပြပါသည်။',
+readOnly:'ကြည့်ရန်သီးသန့် · လျှို့ဝှက်သော့နှင့် ပြေစာအကြောင်းအရာ မပါဝင်ပါ။',close:'ပိတ်ရန်',related:'သက်ဆိုင်ရာ မှတ်တမ်းသို့',unavailable:'ဆက်စပ်မှတ်တမ်း မရှိပါ။',
+exported:'CSV ထုတ်ယူနေပါပြီ',exportError:'CSV ထုတ်မရပါ။',stale:'နောက်ဆုံးဖတ်ထားသည့် ဒေတာကို ပြထားသည်။ ပြန်ဖတ်ကြည့်ပါ။',utc:'ရွေးထားသော ရက်အပိုင်းအခြားသည် UTC ဖြစ်သည်။',
+copied:'ကူးပြီးပါပြီ',copy:'ဖြစ်စဉ် ID ကူးရန်',noValue:'မမှတ်တမ်းတင်ထား',sensitiveOnly:'အရေးကြီးမှုသာ',recorded:'သိမ်းချိန်',
+origin:'မူရင်း မှတ်တမ်းများ',historyHint:'အဟောင်းမှတ်တမ်းများတွင် လုံခြုံရေးနှင့် မပြောင်းမီ/ပြီး တန်ဖိုးများ မပါနိုင်ပါ။',
+};
+const th:Partial<Record<keyof typeof en,string>>={
+title:'บันทึกและความปลอดภัย',description:'ตรวจสอบกิจกรรมผู้ดูแล การเปลี่ยนแปลง และเหตุการณ์ด้านความปลอดภัย',
+export:'ส่งออก CSV',refresh:'รีเฟรช',refreshed:'รีเฟรชข้อมูลแล้ว',error:'โหลดข้อมูลไม่ได้ โปรดลองอีกครั้ง',
+total:'เหตุการณ์ทั้งหมด',successful:'สำเร็จ',failed:'ล้มเหลวหรือถูกบล็อก',sensitive:'การเปลี่ยนแปลงสำคัญ',selected:'ช่วงที่เลือก',ofEvents:'ของเหตุการณ์',inPeriod:'ในช่วงเวลานี้',
+all:'กิจกรรมทั้งหมด',accounts:'บัญชีและการเข้าถึง',packages:'แพ็กเกจและสมาชิก',payments:'การชำระและคืนเงิน',settings:'ตั้งค่าระบบ',security:'ความปลอดภัย',operations:'การดำเนินงาน',
+search:'ค้นหาผู้ดำเนินการ ลูกค้า หรือรหัสเหตุการณ์…',actor:'ผู้ดำเนินการ',result:'ผลลัพธ์',period:'ช่วงเวลา',sort:'เรียง',any:'ทั้งหมด',
+admin:'ผู้ดูแลระบบ',customer:'ลูกค้า',system:'ระบบ',unknown:'ไม่ทราบ',success:'สำเร็จ',blocked:'ถูกบล็อก',failure:'ล้มเหลว',
+newest:'ล่าสุด',oldest:'เก่าสุด',allDates:'ทุกช่วงเวลา',day:'24 ชั่วโมงล่าสุด',week:'7 วันล่าสุด',month:'30 วันล่าสุด',custom:'กำหนดช่วง',
+from:'จาก',to:'ถึง',clear:'ล้างตัวกรอง',date:'วันที่และเวลา',action:'การกระทำ / เหตุการณ์',target:'เป้าหมาย / รายละเอียด',ip:'ที่อยู่ IP',actions:'การดำเนินการ',
+view:'ดูรายละเอียด',empty:'ยังไม่มีบันทึก',noMatch:'ไม่พบเหตุการณ์ที่ตรงกับตัวกรอง',emptyHint:'กิจกรรมและเหตุการณ์ความปลอดภัยจะแสดงที่นี่',
+showing:'แสดง',of:'จาก',events:'เหตุการณ์',previous:'หน้าก่อน',next:'หน้าถัดไป',details:'รายละเอียดเหตุการณ์',summary:'สรุปเหตุการณ์',context:'ข้อมูลความปลอดภัย',
+changes:'การเปลี่ยนแปลงที่บันทึก',reason:'เหตุผล',field:'ข้อมูล',before:'ก่อน',after:'หลัง',noChanges:'เหตุการณ์นี้ไม่ได้บันทึกค่าก่อนและหลัง',
+recordedFields:'ข้อมูลที่เปลี่ยน',source:'แหล่งข้อมูล',sourceId:'รหัสต้นทาง',browser:'เบราว์เซอร์',request:'รหัสคำขอ',masked:'ปิดบังบางส่วนของ IP ข้อมูลที่ไม่ได้บันทึกแสดงเป็น —',
+readOnly:'บันทึกอ่านอย่างเดียว · ไม่แสดงข้อมูลลับหรือเนื้อหาใบเสร็จ',close:'ปิด',related:'เปิดรายการที่เกี่ยวข้อง',unavailable:'ไม่มีรายการที่เกี่ยวข้อง',
+exported:'เริ่มส่งออก CSV แล้ว',exportError:'ส่งออก CSV ไม่สำเร็จ',stale:'แสดงข้อมูลที่โหลดล่าสุด กรุณารีเฟรช',utc:'ช่วงวันที่กำหนดใช้เวลา UTC',
+copied:'คัดลอกแล้ว',copy:'คัดลอกรหัสเหตุการณ์',noValue:'ไม่ได้บันทึก',sensitiveOnly:'เฉพาะสำคัญ',recorded:'บันทึกเมื่อ',origin:'บันทึกต้นฉบับ',historyHint:'บันทึกเก่าอาจไม่มีข้อมูลความปลอดภัยหรือค่าก่อนและหลัง',
+};
+const actions:Record<string,[string,string,string]>={
+
+smtp_email_success:['Test email accepted by mail server','စမ်းသပ်အီးမေးလ်ကို Mail server လက်ခံပြီး','เซิร์ฟเวอร์รับอีเมลทดสอบแล้ว'],
+smtp_email_error:['Test email failed','စမ်းသပ်အီးမေးလ် မအောင်မြင်','ส่งอีเมลทดสอบล้มเหลว'],
+smtp_connection_success:['SMTP connection verified','SMTP ချိတ်ဆက်မှု အောင်မြင်','ตรวจสอบการเชื่อมต่อ SMTP แล้ว'],
+smtp_connection_error:['SMTP connection failed','SMTP ချိတ်ဆက်မှု မအောင်မြင်','เชื่อมต่อ SMTP ล้มเหลว'],
+connection_test:['Connection test','ချိတ်ဆက်မှု စမ်းသပ်','ทดสอบการเชื่อมต่อ'],
+reset_password:['Password reset by Admin','စီမံသူက စကားဝှက် ပြန်သတ်မှတ်','ผู้ดูแลตั้งรหัสผ่านใหม่'],
+revoke_sessions:['Sessions revoked','ဝင်ရောက်မှုများ ရုပ်သိမ်း','เพิกถอนเซสชัน'],
+reactivate:['Account reactivated','အကောင့် ပြန်ဖွင့်','เปิดบัญชีอีกครั้ง'],
+adjusted:['Usage allowance adjusted','အသုံးပြုခွင့် ပြန်ညှိ','ปรับยอดการใช้งาน'],
+under_review:['Payment under review','ပေးချေမှု စစ်ဆေးဆဲ','กำลังตรวจสอบการชำระ'],
+request_information:['More information requested','အချက်အလက် ထပ်တောင်း','ขอข้อมูลเพิ่มเติม'],
+refund_complete:['Refund completed','ငွေပြန်အမ်းပြီး','คืนเงินเสร็จแล้ว'],
+login_success:['Signed in','ဝင်ရောက် အောင်မြင်','เข้าสู่ระบบสำเร็จ'],login_failed:['Sign-in failed','ဝင်ရောက်မှု မအောင်မြင်','เข้าสู่ระบบล้มเหลว'],
+login_blocked:['Sign-in blocked','ဝင်ရောက်မှု တားဆီး','การเข้าสู่ระบบถูกบล็อก'],logout:['Signed out','ထွက်ခွာပြီး','ออกจากระบบ'],
+password_reset:['Password reset','စကားဝှက် ပြန်သတ်မှတ်','ตั้งรหัสผ่านใหม่'],access_blocked:['Access blocked','ဝင်ခွင့် တားဆီး','การเข้าถึงถูกบล็อก'],
+created:['Created','ဖန်တီးပြီး','สร้างแล้ว'],create:['Created','ဖန်တီးပြီး','สร้างแล้ว'],edit:['Account updated','အကောင့် ပြင်ဆင်','แก้ไขบัญชี'],
+edited:['Package updated','ပက်ကေ့ချ် ပြင်ဆင်','แก้ไขแพ็กเกจ'],approve:['Payment approved','ငွေပေးချေမှု အတည်ပြု','อนุมัติการชำระ'],
+approved:['Payment approved','ငွေပေးချေမှု အတည်ပြု','อนุมัติการชำระ'],configuration_saved:['Configuration saved','သတ်မှတ်ချက် သိမ်းပြီး','บันทึกการตั้งค่า'],
+suspend:['Account suspended','အကောင့် ဆိုင်းငံ့','ระงับบัญชี'],activate:['Activated','စတင်အသုံးပြု','เปิดใช้งาน'],deactivate:['Deactivated','ပိတ်ထား','ปิดใช้งาน'],
+archive:['Archived','မော်ကွန်းသိမ်း','เก็บถาวร'],restore:['Restored','ပြန်လည်ရယူ','กู้คืน'],password:['Password changed','စကားဝှက် ပြောင်းလဲ','เปลี่ยนรหัสผ่าน'],
+revoke:['Sessions revoked','ဝင်ရောက်မှုများ ရုပ်သိမ်း','เพิกถอนเซสชัน'],welcome_email:['Login email attempted','ဝင်ရောက်ရန် အီးမေးလ်ပို့မှု','การส่งอีเมลเข้าสู่ระบบ'],
+subscription_payment:['Paid access assigned','ပေးချေထားသော အသုံးပြုခွင့်','มอบสิทธิ์จากการชำระ'],subscription_end:['Subscription ended','အဖွဲ့ဝင်ကာလ ရပ်ဆိုင်း','สิ้นสุดสมาชิก'],
+subscription_renew:['Subscription renewed','အဖွဲ့ဝင် သက်တမ်းတိုး','ต่ออายุสมาชิก'],subscription_change:['Subscription changed','အဖွဲ့ဝင် ပြောင်းလဲ','เปลี่ยนสมาชิก'],
+reject:['Payment rejected','ပေးချေမှု ငြင်းပယ်','ปฏิเสธการชำระ'],update:['Updated','ပြင်ဆင်ပြီး','แก้ไขแล้ว'],refund:['Refund recorded','ပြန်အမ်းမှု မှတ်တမ်း','บันทึกคืนเงิน'],
+retry:['Job retry requested','လုပ်ငန်း ပြန်လုပ်ရန်','ขอลองงานใหม่'],cancel:['Cancelled','ပယ်ဖျက်ပြီး','ยกเลิกแล้ว'],
+};
+export function useAuditText(){
+ const {locale}=usePage<SharedData>().props;const language=locale==='my'?my:locale==='th'?th:{};
+ const t=(key:keyof typeof en)=>language[key]??en[key];
+ const action=(value:string)=>{const key=value.split('.').at(-1)??value;return actions[key]?.[locale==='my'?1:locale==='th'?2:0]??key.replaceAll('_',' ').replace(/^./,c=>c.toUpperCase());};
+ return {t,action,locale};
+}

@@ -1,0 +1,32 @@
+import { usePage } from '@inertiajs/react';
+import type { SharedData } from '@/types';
+const words = {
+    studio: ['Preview Studio', 'နမူနာစမ်းသပ်ခန်း', 'สตูดิโอตัวอย่าง'],
+    studioHint: ['Listen, check timing and preview a short clip before the full export.', 'အပြည့်မထုတ်မီ အသံ၊ ကြာချိန်နှင့် ဗီဒီယိုတိုကို စမ်းကြည့်ပါ။', 'ฟัง ตรวจเวลา และดูคลิปสั้นก่อนส่งออกทั้งหมด'],
+    voiceSample: ['Listen to voice', 'အသံစမ်းနားထောင်ရန်', 'ฟังตัวอย่างเสียง'], videoSample: ['Preview 15-second clip', '၁၅ စက္ကန့် နမူနာကြည့်ရန်', 'ดูตัวอย่างคลิป 15 วินาที'],
+    timing: ['Check all line timings', 'စာကြောင်းအားလုံး ကြာချိန်စစ်ရန်', 'ตรวจเวลาทุกบรรทัด'],
+    timingHint: ['Creates missing voice lines to measure real timing. Cached voices are reused for the final export.', 'ကြာချိန်အမှန်စစ်ရန် မရှိသေးသောအသံများ ထုတ်မည်။ အပြည့်ထုတ်သည့်အခါ ထိုအသံများကို ပြန်သုံးမည်။', 'สร้างเสียงที่ยังไม่มีเพื่อวัดเวลาจริง และใช้เสียงที่แคชไว้ในการส่งออก'],
+    line: ['Script line', 'စာမူအကြောင်း', 'บรรทัดสคริปต์'], shorten: ['Suggest a shorter line', 'စာမူတိုအောင် အကြံပြုရန်', 'แนะนำข้อความที่สั้นลง'], apply: ['Use this text', 'ဒီစာမူကို သုံးရန်', 'ใช้ข้อความนี้'],
+    suggestion: ['Suggested text — review before applying', 'အကြံပြုစာမူ — အသုံးမပြုမီ စစ်ဆေးပါ', 'ข้อความแนะนำ — ตรวจสอบก่อนใช้'],
+    queued: ['Preview queued', 'နမူနာထုတ်ရန် တန်းစီနေသည်', 'ตัวอย่างอยู่ในคิว'], running: ['Preparing your preview', 'နမူနာ ပြင်ဆင်နေသည်', 'กำลังเตรียมตัวอย่าง'], completed: ['Preview ready', 'နမူနာ အသင့်ဖြစ်ပြီ', 'ตัวอย่างพร้อมแล้ว'], failed: ['Preview could not be prepared', 'နမူနာထုတ်၍ မရပါ', 'เตรียมตัวอย่างไม่สำเร็จ'], cancelled: ['Preview cancelled', 'နမူနာထုတ်ခြင်း ရပ်ပြီးပါပြီ', 'ยกเลิกตัวอย่างแล้ว'],
+    cancel: ['Cancel', 'ရပ်ရန်', 'ยกเลิก'], outdated: ['Settings or script changed. Prepare a fresh preview before relying on this result.', 'သတ်မှတ်ချက် သို့မဟုတ် စာမူပြောင်းထားသည်။ နမူနာအသစ် ပြန်ထုတ်စစ်ပါ။', 'การตั้งค่าหรือสคริปต์เปลี่ยนแล้ว โปรดสร้างตัวอย่างใหม่'],
+    original: ['Original', 'မူရင်း', 'ต้นฉบับ'], narration: ['Narration', 'မြန်မာအသံ', 'เสียงบรรยาย'], adjusted: ['Adjusted', 'ညှိပြီးကြာချိန်', 'เวลาที่ปรับแล้ว'],
+    extra: ['Longer than source', 'မူရင်းထက် ပိုရှည်သည်', 'ยาวกว่าต้นฉบับ'], fits: ['Fits original timing', 'မူရင်းအချိန်နှင့် ကိုက်သည်', 'พอดีกับเวลาต้นฉบับ'],
+    seconds: ['s', 'စက္ကန့်', 'วินาที'], warnings: ['lines need timing review', 'ကြောင်းကို ကြာချိန် ပြန်စစ်သင့်သည်', 'บรรทัดควรตรวจเวลา'],
+    presets: ['Your presets', 'သိမ်းထားသောပုံစံများ', 'การตั้งค่าของคุณ'], presetHint: ['Save your voice, background and output settings for the next project.', 'အသံ၊ နောက်ခံနှင့် ထုတ်မည့်ပုံစံကို နောက်ပရောဂျက်တွင် ပြန်သုံးရန် သိမ်းထားပါ။', 'บันทึกเสียง พื้นหลัง และรูปแบบส่งออกไว้ใช้กับโปรเจกต์ถัดไป'],
+    choosePreset: ['Choose a preset', 'သိမ်းထားသောပုံစံ ရွေးပါ', 'เลือกการตั้งค่า'], savePreset: ['Save preset', 'ပုံစံသိမ်းရန်', 'บันทึกการตั้งค่า'], presetName: ['Preset name', 'ပုံစံအမည်', 'ชื่อการตั้งค่า'], presetSaved: ['Preset saved', 'ပုံစံ သိမ်းပြီးပါပြီ', 'บันทึกแล้ว'], presetApplied: ['Preset applied. Save the project to keep these settings.', 'ပုံစံအသုံးပြုထားပါပြီ။ အတည်ထားရန် ပရောဂျက်ကို သိမ်းပါ။', 'ใช้การตั้งค่าแล้ว บันทึกโปรเจกต์เพื่อเก็บการเปลี่ยนแปลง'],
+    presetOverwrite: ['Using the same name updates that preset. Up to 12 presets per account.', 'အမည်တူလျှင် ရှိပြီးသားပုံစံကို ပြင်သိမ်းမည်။ အကောင့်တစ်ခုလျှင် ၁၂ ခုအထိ သိမ်းနိုင်သည်။', 'ชื่อเดิมจะอัปเดตการตั้งค่านั้น บันทึกได้สูงสุด 12 รายการต่อบัญชี'],
+    removePreset: ['Delete preset', 'ပုံစံဖျက်ရန်', 'ลบการตั้งค่า'], removeQuestion: ['Delete this saved preset?', 'သိမ်းထားသော ဤပုံစံကို ဖျက်မလား။', 'ลบการตั้งค่านี้หรือไม่'],
+    audioFormat: ['Audio format', 'အသံဖိုင်ပုံစံ', 'รูปแบบไฟล์เสียง'],
+    generateAudio: ['Generate audio', 'အသံဖိုင်ထုတ်ရန်', 'สร้างไฟล์เสียง'],
+    audioOutput: ['Audio only', 'အသံဖိုင်သီးသန့်', 'เฉพาะเสียง'], audioHint: ['Burmese narration for your video editor', 'ဗီဒီယိုတည်းဖြတ်ရာတွင် သုံးရန် မြန်မာအသံဖိုင်', 'เสียงพากย์พม่าเพื่อใช้ในโปรแกรมตัดต่อ'],
+    audioTrack: ['Audio track', 'အသံဖိုင်ပါဝင်မှု', 'แทร็กเสียง'], mix: ['Narration + background', 'မြန်မာအသံ + နောက်ခံ', 'เสียงบรรยาย + พื้นหลัง'], dry: ['Narration only', 'မြန်မာအသံ သီးသန့်', 'เฉพาะเสียงบรรยาย'],
+    captions: ['Burn subtitles into video', 'ဗီဒီယိုထဲ စာတန်းထည့်မည်', 'ฝังคำบรรยายในวิดีโอ'], captionHint: ['SRT is also saved separately, even when burned subtitles are off.', 'ဗီဒီယိုစာတန်း ပိတ်ထားလည်း SRT ဖိုင်ကို သီးသန့်သိမ်းပေးမည်။', 'บันทึก SRT แยกไว้ด้วย แม้ปิดการฝังคำบรรยาย'],
+    duck: ['Lower background while speaking', 'စကားပြောချိန် နောက်ခံအသံလျှော့မည်', 'ลดเสียงพื้นหลังขณะพูด'],
+    downloadAudio: ['Download audio', 'အသံဖိုင် ဒေါင်းလုဒ်', 'ดาวน์โหลดเสียง'], bgReady: ['Original speech is removed before mixing the background with Burmese narration.', 'မူရင်းစကားသံကို ဖယ်ပြီး နောက်ခံတီးလုံးနှင့် မြန်မာအသံကို ပေါင်းမည်။', 'แยกเสียงพูดต้นฉบับก่อนผสมพื้นหลังกับเสียงบรรยายพม่า'],
+    bgQuality: ['Separation may leave artifacts. Listen to the sample before the full render.', 'အသံခွဲရလဒ်တွင် မသန့်သောအသံ ကျန်နိုင်သည်။ အပြည့်မထုတ်မီ နမူနာကို နားထောင်စစ်ပါ။', 'การแยกเสียงอาจมีเสียงรบกวน โปรดฟังตัวอย่างก่อนเรนเดอร์ทั้งหมด'],
+    separate: ['Separate background music & effects', 'နောက်ခံတီးလုံးနှင့် effects ခွဲထုတ်ရန်', 'แยกดนตรีและเอฟเฟกต์พื้นหลัง'],
+    preview: ['Preview', 'နမူနာ', 'ตัวอย่าง'], busyHint: ['A preview is processing. You can return here to check it.', 'နမူနာထုတ်နေသည်။ ဤနေရာကို ပြန်ဝင်ပြီး စစ်နိုင်သည်။', 'กำลังประมวลผลตัวอย่าง กลับมาตรวจสอบได้ที่นี่'],
+    savedFirst: ['Uses the script shown here. Apply a suggestion, then save your script before the final export.', 'ယခုမြင်ရသော စာမူဖြင့် စမ်းမည်။ အကြံပြုစာမူကို သုံးပြီးပါက အပြည့်မထုတ်မီ စာမူသိမ်းပါ။', 'ใช้สคริปต์ที่แสดงอยู่ เมื่อนำคำแนะนำไปใช้ ให้บันทึกสคริปต์ก่อนส่งออก'],
+} satisfies Record<string,[string,string,string]>;
+export function useCreatorText(){const {locale}=usePage<SharedData>().props;return {t:(key:keyof typeof words)=>words[key][locale==='my'?1:locale==='th'?2:0]};}

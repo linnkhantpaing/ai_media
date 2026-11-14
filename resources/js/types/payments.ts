@@ -1,0 +1,14 @@
+export type Currency='MMK'|'THB'|'USD';
+export type MethodType='wallet'|'bank'|'other';
+export type MethodStatus='active'|'inactive'|'archived';
+export type PaymentAction='default'|'activate'|'deactivate'|'archive'|'restore';
+export type Instructions=Record<'my'|'en'|'th',string>;
+export type CurrencySettings=Record<Currency,{enabled:boolean;default_id:number|null}>;
+export type PaymentRules={evidence_required:boolean;reference_required:boolean;sender_required:boolean;transfer_date_required:boolean;expiry_hours:number;instructions:Instructions};
+export type PaymentSettings={revision:number;currencies:CurrencySettings;rules:PaymentRules;saved_at:string|null};
+export type PaymentMethod={id:number;name:string;type:MethodType;currency:Currency;provider:string;status:MethodStatus;revision:number;sort_order:number;holder:string;masked_identifier:string;ready:boolean;is_default:boolean;usable:boolean;duplicate:boolean;qr_url:string|null;updated_at:string;show_url:string;action_url:string};
+export type FullPaymentMethod=PaymentMethod&{details:{holder:string;identifier:string;branch:string;routing:string};instructions:Instructions;internal_label:string|null};
+export type PaymentEvent={id:number;action:string;actor:string|null;metadata:Record<string,unknown>;created_at:string};
+export type PaymentDetails={method:FullPaymentMethod;history:PaymentEvent[];config_revision:number};
+export type PaymentFilters={q:string;currency:Currency|'';type:MethodType|'';status:MethodStatus|'';per_page:number};
+export type PaymentList={settings:PaymentSettings;summary:Record<Currency,{total:number;active:number;default_name:string|null}>;methods:PaymentMethod[];options:{id:number;name:string;currency:Currency;status:MethodStatus;ready:boolean}[];pagination:{page:number;pages:number;total:number;from:number|null;to:number|null};filters:PaymentFilters;timezone:string;endpoints:{index:string;store:string;currencies:string;rules:string}};

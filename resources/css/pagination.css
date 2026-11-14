@@ -1,0 +1,9 @@
+.pagination-boundary-button{flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;min-width:32px;min-height:32px;gap:0}.pagination-boundary-button>svg{width:16px;height:16px;flex-shrink:0}.pagination-boundary-button:disabled{cursor:not-allowed!important}.pagination-boundary-button:focus-visible{outline:2px solid var(--primary);outline-offset:3px}
+@media(max-width:760px){
+ .as-pagination,.aj-pagination,.wh-pagination,.usage-pagination>div,.usage-inner-pagination,.accounts-pagination>div,.accounts-pagination>nav,.pay-list-footer>nav,.library-pagination,.ops-pagination>nav{flex-wrap:wrap;max-width:100%;row-gap:8px}
+ .as-pagination,.aj-pagination,.wh-pagination,.usage-pagination>div,.accounts-pagination>div,.accounts-pagination>nav,.pay-list-footer>nav,.library-pagination,.ops-pagination>nav{justify-content:flex-end}
+ .as-pagination>.action-tooltip-anchor,.aj-pagination>.action-tooltip-anchor,.wh-pagination>.action-tooltip-anchor,.usage-inner-pagination>.action-tooltip-anchor{flex-shrink:0}
+}
+
+.usage-inner-pagination>.action-tooltip-anchor{margin-right:0;color:inherit}
+@media(max-width:760px){.aj-pagination>div,.pay-pagination nav{flex-wrap:wrap;max-width:100%;justify-content:flex-end;row-gap:8px}}

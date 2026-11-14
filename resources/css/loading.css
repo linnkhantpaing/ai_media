@@ -1,0 +1,15 @@
+.app-loading-dialog { position: fixed; inset: 0; display: grid; place-items: center; width: 100vw; max-width: none; height: 100dvh; max-height: none; margin: 0; padding: 20px; overflow: hidden; border: 0; outline: 0; background: transparent; color: var(--text); }
+.app-loading-dialog::backdrop { background: color-mix(in srgb,var(--background) 58%,transparent); backdrop-filter: blur(9px) saturate(.8); -webkit-backdrop-filter: blur(9px) saturate(.8); }
+.app-loading-art { position: relative; display: grid; place-items: center; width: 112px; height: 112px; }
+.app-loading-halo { position: absolute; inset: 14px; border-radius: 50%; background: color-mix(in srgb,var(--primary) 14%,transparent); filter: blur(15px); animation: app-loading-breathe 2.4s ease-in-out infinite; }
+.app-loading-orbit { position: absolute; inset: 2px; border-radius: 50%; border: 1px solid color-mix(in srgb,var(--primary) 14%,transparent); border-top: 2px solid var(--primary); border-right-color: color-mix(in srgb,var(--primary) 60%,transparent); animation: app-loading-orbit 1.8s linear infinite; }
+.app-loading-orbit::after { content: ''; position: absolute; top: 12px; right: 12px; width: 5px; height: 5px; border-radius: 50%; background: var(--mint); box-shadow: 0 0 9px color-mix(in srgb,var(--mint) 65%,transparent); }
+.app-loading-orbit.is-inner { inset: 13px; border-top-color: var(--accent); border-right-color: transparent; border-bottom-color: color-mix(in srgb,var(--primary) 42%,transparent); animation-duration: 3s; animation-direction: reverse; }
+.app-loading-orbit.is-inner::after { display: none; }
+.app-loading-symbol { display: grid; place-items: center; width: 63px; height: 63px; border: 0; border-radius: 50%; background: transparent; }
+.app-loading-symbol > svg { width: 34px; height: 34px; color: var(--primary); stroke-width: 1.6; }
+.app-loading-spark { position: absolute; left: 6px; bottom: 17px; width: 4px; height: 4px; background: var(--primary); border-radius: 50%; opacity: .6; }
+@keyframes app-loading-orbit { to { transform: rotate(360deg); } }
+@keyframes app-loading-breathe { 50% { opacity: .45; transform: scale(.88); } }
+@media (prefers-reduced-motion: reduce) { .app-loading-dialog *, .app-loading-dialog *::after { animation: none !important; } }
+.app-loading-indicator { position: relative; display: grid; place-items: center; width: 112px; height: 112px; background: transparent; border: 0; box-shadow: none; }
