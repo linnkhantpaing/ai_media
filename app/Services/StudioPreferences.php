@@ -228,7 +228,7 @@ class StudioPreferences
     /**
      * Saves the language, personal Studio defaults and Name Dictionary together.
      *
-     * @param  array{locale: string, settings: array<string, mixed>, name_dictionary: array<int, array<string, mixed>>}  $data
+     * @param  array{locale?: string, settings: array<string, mixed>, name_dictionary: array<int, array<string, mixed>>}  $data
      */
     public function save(User $user, array $data): void
     {
@@ -250,7 +250,7 @@ class StudioPreferences
         DB::transaction(function () use ($user, $data, $changed, $dictionary): void {
             User::whereKey($user->id)->lockForUpdate()->firstOrFail();
             $user->forceFill([
-                'preferred_locale' => $data['locale'],
+                'preferred_locale' => $data['locale'] ?? $user->preferred_locale,
                 'studio_preferences' => $changed === [] ? null : $changed,
                 'recap_name_dictionary' => $dictionary,
             ])->save();

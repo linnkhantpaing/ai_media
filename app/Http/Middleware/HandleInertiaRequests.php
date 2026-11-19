@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Services\CustomerProfile;
 use App\Services\GeneralSettings;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
@@ -15,14 +16,17 @@ class HandleInertiaRequests extends Middleware
     {
         $adminArea = $request->is('admin', 'admin/*');
         $user = $request->user($adminArea ? 'admin' : 'web');
+        $customer = ! $adminArea && $user && ! $user->is_admin;
+        $platform = $request->attributes->get('platform_settings') ?? app(GeneralSettings::class)->publicData();
 
         return [
             ...parent::share($request),
-            'app' => $request->attributes->get('platform_settings') ?? app(GeneralSettings::class)->publicData(),
+            'app' => $customer ? app(CustomerProfile::class)->applyDisplay($platform, $user) : $platform,
             'locale' => app()->getLocale(),
             'auth' => ['user' => $user ? [
                 ...$user->only(['name', 'email']),
                 'is_admin' => (bool) $user->is_admin,
+                'avatar_url' => $customer ? app(CustomerProfile::class)->avatarUrl($user) : null,
             ] : null],
             'adminLinks' => $adminArea && $user?->is_admin ? ['support' => route('admin.support.index', absolute: false), 'usageReports' => route('admin.processing.index', absolute: false), 'revenue' => route('admin.revenue.index', absolute: false), 'notifications' => route('admin.notifications.index', absolute: false), 'audit' => route('admin.audit.index', absolute: false), 'generalSettings' => route('admin.settings.general', absolute: false), 'dashboard' => route('admin.dashboard', absolute: false), 'users' => route('admin.users.index', absolute: false), 'packages' => route('admin.packages.index', absolute: false), 'subscriptions' => route('admin.subscriptions.index', absolute: false), 'providers' => route('admin.settings.providers', absolute: false), 'storage' => route('admin.settings.storage', absolute: false), 'usageLedger' => route('admin.usage.index', absolute: false), 'payments' => route('admin.payments.index', absolute: false), 'paymentSettings' => route('admin.settings.payments', absolute: false), 'defaults' => route('admin.settings.defaults', absolute: false), 'jobMonitor' => route('admin.jobs.index', absolute: false), 'workerHealth' => route('admin.jobs.workers', absolute: false)] : [],
             'supportFeed' => ! $adminArea && $user && ! $user->is_admin ? route('support.chat', absolute: false) : null,

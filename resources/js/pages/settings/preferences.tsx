@@ -7,7 +7,8 @@ import {MediaDialog,SelectField} from '@/components/media-workflow';
 import {mediaApi,MediaApiError} from '@/lib/media-api';
 import {useToast} from '@/lib/toast';
 import {voiceLabel} from '@/lib/media-voices';
-import {languageNames,languageShort,preferenceWord,usePreferenceText,type PreferenceWord} from '@/lib/preferences-i18n';
+import {languageNames,languageShort,usePreferenceText,type PreferenceWord} from '@/lib/preferences-i18n';
+import {AccountTab} from '@/components/preferences-account';
 import {durationChoices,narrationLanguages,narrationStyles,outputFeature,outputsFor,subtitleLookOf,subtitleLooks,withWorkflow,workflowFeature,workflows,type StudioPreferenceValues,type SubtitleLookKey,type Workflow} from '@/lib/studio-defaults';
 import type {SharedData} from '@/types';
 import type {NameDictionaryEntry} from '@/types/media';
@@ -24,7 +25,7 @@ const pageSize=10;
 
 function draftFrom(data:PreferencesData):PreferencesDraft{
  const settings={...data.baseline,...data.saved} as StudioPreferenceValues;
- return {locale:data.locale,settings:withWorkflow(settings,settings.workflow),dictionary:data.dictionary.map(entry=>({...entry}))};
+ return {profile:{name:data.profile.name,display:{...data.profile.display}},settings:withWorkflow(settings,settings.workflow),dictionary:data.dictionary.map(entry=>({...entry}))};
 }
 function apiMessage(error:unknown,t:Text){
  if(error instanceof MediaApiError){if(error.code==='session_expired')return t('sessionExpired');if(error.code==='rate_limited')return t('rateLimited');if(error.status===422)return Object.values(error.fields).flat()[0]??t('saveFailed');}
@@ -61,18 +62,22 @@ export default function Preferences({preferences}:{preferences:PreferencesData})
   if(saving||!dirty)return;
   setSaving(true);setErrors({});
   try{
-   const result=await mediaApi<{preferences:PreferencesData}>(data.endpoints.save,'PUT',{locale:draft.locale,settings:draft.settings,name_dictionary:draft.dictionary});
-   const localeChanged=draft.locale!==data.locale;
-   setData(result.preferences);setDraft(draftFrom(result.preferences));toast.success(localeChanged?preferenceWord('savedToast',draft.locale):t('savedToast'));
-   if(localeChanged){bypass.current=true;router.visit(window.location.pathname+'?tab='+tab,{preserveScroll:true,onFinish:()=>{bypass.current=false;}});}
+   const result=await mediaApi<{preferences:PreferencesData}>(data.endpoints.save,'PUT',{profile:draft.profile,settings:draft.settings,name_dictionary:draft.dictionary});
+   const profileChanged=JSON.stringify(draft.profile)!==JSON.stringify(saved.profile);
+   setData(result.preferences);setDraft(draftFrom(result.preferences));toast.success(t('savedToast'));
+   if(profileChanged)refreshShared();
   }catch(error){
    const fields=error instanceof MediaApiError?error.fields:{};setErrors(fields);toast.error(apiMessage(error,t));
    const first=Object.keys(fields)[0];
-   if(first){changeTab(first.startsWith('name_dictionary')?'dictionary':first.startsWith('settings')?'defaults':'general');}
+   if(first){changeTab(first.startsWith('name_dictionary')?'dictionary':first.startsWith('settings')?'defaults':'general');if(first==='profile.name')requestAnimationFrame(()=>document.getElementById('pref-display-name')?.focus());}
   }finally{setSaving(false);}
  }
  function discard(){setDraft(saved);setErrors({});}
- function presetsChanged(next:PreferencesData){setData(old=>({...next,saved:old.saved,locale:old.locale,dictionary:old.dictionary}));}
+ function presetsChanged(next:PreferencesData){setData(old=>({...next,saved:old.saved,dictionary:old.dictionary,profile:old.profile}));}
+ /** Reloads the header name, photo and date display without leaving the page. */
+ function refreshShared(){bypass.current=true;router.reload({only:['auth','app'],onFinish:()=>{bypass.current=false;}});}
+ function accountChanged(next:PreferencesData,message:string,refresh=false){setData(old=>({...old,profile:next.profile}));toast.success(message);if(refresh)refreshShared();}
+ function patchProfile(patch:Partial<PreferencesDraft['profile']>){setDraft(old=>({...old,profile:{...old.profile,...patch}}));setErrors(old=>Object.fromEntries(Object.entries(old).filter(([key])=>!key.startsWith('profile.'))));}
 
  const defaultPreset=data.presets.find(preset=>preset.is_default)??null;
  const header=<div className={'pref-actions'+(dirty?' is-dirty':'')}>
@@ -94,7 +99,7 @@ export default function Preferences({preferences}:{preferences:PreferencesData})
     </button>)}
    </nav>
    <div className="pref-panel" role="tabpanel" id={'pref-panel-'+tab} aria-labelledby={'pref-tab-'+tab}>
-    {tab==='general'&&<GeneralTab locale={draft.locale} onLocale={locale=>setDraft(old=>({...old,locale}))} t={t}/>}
+    {tab==='general'&&<AccountTab data={data} draft={draft.profile} onProfile={patchProfile} onChanged={accountChanged} errors={errors}/>}
     {tab==='defaults'&&<>
      {defaultPreset&&<div className="pref-notice"><StudioIcon name="info"/><div><strong>{t('defaultPresetActive')}: “{defaultPreset.name}”</strong><span>{t('defaultPresetActiveHint')}</span></div><button type="button" className="pref-link" onClick={()=>changeTab('presets')}>{t('viewPresets')}</button></div>}
      <StudioFields values={draft.settings} onChange={patchSettings} data={data} errors={errors} prefix="settings" t={t}/>
@@ -103,25 +108,13 @@ export default function Preferences({preferences}:{preferences:PreferencesData})
     {tab==='presets'&&<PresetsTab data={data} current={draft.settings} onChanged={presetsChanged} t={t}/>}
     {tab==='dictionary'&&<DictionaryTab entries={draft.dictionary} onChange={setDictionary} errors={errors} limit={data.limits.dictionary} defaultLanguage={draft.settings.narration_lang} t={t}/>}
    </div>
-   <p className="pref-footnote"><StudioIcon name="info"/>{t('dictionaryNewProjects')}</p>
+   {tab!=='general'&&tab!=='presets'&&<p className="pref-footnote"><StudioIcon name="info"/>{t('dictionaryNewProjects')}</p>}
   </section>
   <MediaDialog open={!!leaving} title={t('leaveTitle')} onClose={()=>setLeaving(null)} className="pref-confirm" animated>
    <p className="pref-confirm-body">{t('leaveBody')}</p>
    <div className="pref-dialog-actions"><button type="button" className="pref-button" onClick={()=>setLeaving(null)}>{t('stay')}</button><button type="button" className="pref-button danger" onClick={()=>{const go=leaving;setLeaving(null);go?.();}}>{t('leave')}</button></div>
   </MediaDialog>
  </AppLayout>;
-}
-
-function GeneralTab({locale,onLocale,t}:{locale:PreferencesDraft['locale'];onLocale:(value:PreferencesDraft['locale'])=>void;t:Text}){
- const {app}=usePage<SharedData>().props;
- const timezone=(app as {timezone?:string}).timezone??'UTC';
- const format=(app as {time_format?:string}).time_format==='24'?t('hour24'):t('hour12');
- return <div className="pref-card pref-general">
-  <div className="pref-setting"><span className="pref-setting-icon"><StudioIcon name="globe"/></span><div className="pref-setting-text"><strong>{t('interfaceLanguage')}</strong><small>{t('interfaceLanguageHint')}</small></div>
-   <div className="pref-setting-control"><SelectField label={t('interfaceLanguage')} value={locale} onChange={value=>onLocale(value as PreferencesDraft['locale'])} options={(['my','en','th'] as const).map(value=>({value,label:languageNames[value],image:flags[value]}))}/></div></div>
-  <div className="pref-setting"><span className="pref-setting-icon"><StudioIcon name="clock"/></span><div className="pref-setting-text"><strong>{t('dateTime')}</strong><small>{t('dateTimeHint')}</small></div>
-   <div className="pref-setting-control"><ActionTooltip label={t('setByAdmin')}><div className="pref-readonly" tabIndex={0} aria-label={t('dateTime')+': '+timezone+' · '+format}><span>{timezone} · {format}</span><StudioIcon name="lock"/></div></ActionTooltip></div></div>
- </div>;
 }
 
 function ResetDefaults({onReset,t}:{onReset:()=>void;t:Text}){

@@ -4,16 +4,23 @@ namespace App\Http\Controllers;
 
 use App\Exceptions\MediaFailure;
 use App\Models\User;
+use App\Services\CustomerProfile;
 use App\Services\Media\GeminiClient;
 use App\Services\Media\ProviderSettings;
 use App\Services\StudioPreferences;
 use App\Support\NameDictionary;
+use Closure;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Cookie;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\Password;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 use Symfony\Component\HttpFoundation\Response as HttpResponse;
@@ -34,22 +41,28 @@ class PreferencesController extends Controller
         'vi' => 'Xin chào. Câu chuyện này bắt đầu vào một đêm mưa yên tĩnh.',
     ];
 
-    public function __construct(private StudioPreferences $preferences) {}
+    public function __construct(private StudioPreferences $preferences, private CustomerProfile $profile) {}
 
     public function show(Request $request): Response
     {
-        return Inertia::render('settings/preferences', ['frame' => 'preferences', 'preferences' => $this->payload($request->user())]);
+        return Inertia::render('settings/preferences', ['frame' => 'preferences', 'preferences' => $this->payload($request->user(), $request->session()->getId())]);
     }
 
     public function save(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'locale' => ['required', Rule::in(['my', 'en', 'th'])],
+            'locale' => ['sometimes', Rule::in(['my', 'en', 'th'])],
             ...StudioPreferences::rules(),
             ...NameDictionary::rules(),
+            ...CustomerProfile::rules(),
         ]);
-        $this->preferences->save($request->user(), $data);
-        Cookie::queue(cookie('ui_locale', $data['locale'], 60 * 24 * 365, '/', null, $request->isSecure() || app()->isProduction(), true, false, 'lax'));
+        DB::transaction(function () use ($request, $data): void {
+            $this->preferences->save($request->user(), $data);
+            $this->profile->saveProfile($request->user(), $data['profile']);
+        });
+        if (isset($data['locale'])) {
+            Cookie::queue(cookie('ui_locale', $data['locale'], 60 * 24 * 365, '/', null, $request->isSecure() || app()->isProduction(), true, false, 'lax'));
+        }
 
         return $this->json($request->user()->fresh());
     }
@@ -134,10 +147,86 @@ class PreferencesController extends Controller
         return $disk->response($path, 'voice-sample.wav', ['Content-Type' => 'audio/wav', 'Cache-Control' => 'private, max-age=86400', 'X-Content-Type-Options' => 'nosniff']);
     }
 
+    public function changeEmail(Request $request): JsonResponse
+    {
+        $data = $request->validate(['email' => ['required', 'string', 'email:rfc', 'max:254'], 'password' => ['required', 'string', 'max:255']]);
+        $this->profile->changeEmail($request->user(), $data['email'], $data['password']);
+        $this->profile->signOutOtherDevices($request->user(), $request->session()->getId());
+        $this->keepCurrentSession($request);
+
+        return $this->json($request->user()->fresh());
+    }
+
+    public function changePassword(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'current_password' => ['required', 'string', 'max:255'],
+            'password' => ['required', 'string', 'confirmed', Password::defaults(), function (string $attribute, mixed $value, Closure $fail): void {
+                if (is_string($value) && strlen($value) > 72) {
+                    $fail(__('auth.password_bytes'));
+                }
+            }],
+        ]);
+        $this->profile->changePassword($request->user(), $data['current_password'], $data['password']);
+        $this->profile->signOutOtherDevices($request->user(), $request->session()->getId());
+        $this->keepCurrentSession($request);
+
+        return $this->json($request->user()->fresh());
+    }
+
+    public function savePhoto(Request $request): JsonResponse
+    {
+        $request->validate(['photo' => ['required', 'file', 'max:5120', 'mimes:jpg,jpeg,png,webp', 'extensions:jpg,jpeg,png,webp']]);
+        $this->profile->saveAvatar($request->user(), $request->file('photo'));
+
+        return $this->json($request->user()->fresh());
+    }
+
+    public function removePhoto(Request $request): JsonResponse
+    {
+        $this->profile->removeAvatar($request->user());
+
+        return $this->json($request->user()->fresh());
+    }
+
+    public function avatar(Request $request): HttpResponse
+    {
+        return $this->profile->avatarResponse($request->user());
+    }
+
+    public function signOutDevice(Request $request, string $device): JsonResponse
+    {
+        $this->profile->signOutDevice($request->user(), $device, $request->session()->getId());
+
+        return $this->json($request->user());
+    }
+
+    public function signOutOtherDevices(Request $request): JsonResponse
+    {
+        $data = $request->validate(['password' => ['required', 'string', 'max:255']]);
+        if (! Hash::check($data['password'], $request->user()->password)) {
+            throw ValidationException::withMessages(['password' => 'Your current password is incorrect.']);
+        }
+        $this->profile->signOutOtherDevices($request->user(), $request->session()->getId());
+        $this->keepCurrentSession($request);
+
+        return $this->json($request->user()->fresh());
+    }
+
+    /** Keeps this browser signed in after the account's session version or password changed. */
+    private function keepCurrentSession(Request $request): void
+    {
+        $user = $request->user()->fresh();
+        $request->session()->put('customer_auth_version:'.$user->id, $user->auth_version);
+        $request->session()->put('password_hash_'.Auth::getDefaultDriver(), $user->getAuthPassword());
+        Auth::guard('web')->setUser($user);
+    }
+
     /** @return array<string, mixed> */
-    private function payload(User $user): array
+    private function payload(User $user, ?string $session = null): array
     {
         return [
+            'profile' => $this->profile->present($user, $session ?? request()->session()->getId()),
             'locale' => $user->preferred_locale ?? app()->getLocale(),
             'baseline' => $this->preferences->baseline(),
             'saved' => $this->preferences->pick($user->studio_preferences ?? []),
@@ -155,6 +244,11 @@ class PreferencesController extends Controller
                 'voiceSample' => route('settings.preferences.voice-sample', absolute: false),
                 'newProject' => route('projects.create', absolute: false),
                 'billing' => route('account.billing', absolute: false),
+                'plan' => route('account.plan', absolute: false),
+                'email' => route('settings.preferences.email', absolute: false),
+                'password' => route('settings.preferences.password', absolute: false),
+                'photo' => route('settings.preferences.photo', absolute: false),
+                'devices' => route('settings.preferences.devices.others', absolute: false),
             ],
         ];
     }

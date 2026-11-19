@@ -5,7 +5,7 @@ export interface SharedData {
     [key: string]: unknown;
     app: { name: string; tagline?: string; logo?: string; lightLogo?: string | null; favicon?: string; language?: Locale; timezone?: string; date_format?: string; time_format?: string; support_email?: string; support_phone?: string; support_url?: string; maintenance?: {enabled:boolean; message:string} };
     locale: Locale;
-    auth: { user: { name: string; email: string; is_admin: boolean } | null };
+    auth: { user: { name: string; email: string; is_admin: boolean; avatar_url?: string | null } | null };
     queueFeed?: string | null;
     supportFeed?: string | null;
     notificationLinks?: {index:string;feed:string;action:string}|null;

@@ -91,6 +91,8 @@
 .studio-profile:hover { background: var(--surface-elevated); }
 .studio-profile > svg { width: 14px; height: 14px; color: var(--text-muted); }
 .studio-avatar { display: grid; place-items: center; flex-shrink: 0; width: 32px; height: 32px; border-radius: 50%; font: 750 11px 'Manrope Variable', sans-serif; background: var(--studio-action); color: var(--text-inverse); }
+.studio-avatar.has-photo { overflow: hidden; padding: 0; background: var(--surface); }
+.studio-avatar.has-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .studio-profile-label { min-width: 0; max-width: 128px; text-align: left; line-height: 1.4; }
 .studio-profile-label strong { display: block; overflow: hidden; text-overflow: ellipsis; font-size: 11px; font-weight: 650; white-space: nowrap; }
 .studio-profile-label small { display: block; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; font-size: 9.5px; color: var(--text-muted); white-space: nowrap; }

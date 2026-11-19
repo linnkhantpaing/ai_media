@@ -181,7 +181,7 @@ export default function AppLayout({ children, frame, breadcrumbLabel, area = 'us
                     {adminArea ? (onPrimaryAction ? <button type="button" className="studio-header-action" onClick={onPrimaryAction}><StudioIcon name="plus" /><span>{primaryActionLabel ?? adminText('users')}</span></button> : <Link href={adminLinks?.users ?? links.workspace} className="studio-header-action"><StudioIcon name="users" /><span>{adminText('users')}</span></Link>) : <Link href={frameLinks.newProject!} className="studio-header-action" title={t('newProject')}><StudioIcon name="plus" /><span>{t('newProject')}</span></Link>}
                     <details className="studio-header-menu profile-menu">
                         <summary className="studio-profile" aria-label={t('accountMenu')}>
-                            <span className="studio-avatar">{auth.user?.name.trim().slice(0, 1).toUpperCase() || 'A'}</span>
+                            <span className={'studio-avatar'+(auth.user?.avatar_url?' has-photo':'')}>{auth.user?.avatar_url?<img src={auth.user.avatar_url} alt=""/>:auth.user?.name.trim().slice(0, 1).toUpperCase() || 'A'}</span>
                             <span className="studio-profile-label"><strong>{auth.user?.name}</strong><small>{t(auth.user?.is_admin ? 'adminAccess' : 'memberAccess')}</small></span>
                             <StudioIcon name="chevron" />
                         </summary>

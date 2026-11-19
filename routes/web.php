@@ -107,6 +107,13 @@ Route::middleware(['auth:web', EnsureCustomerAccess::class, 'auth.session', Ensu
     Route::prefix('settings/preferences')->name('settings.preferences.')->controller(PreferencesController::class)->group(function (): void {
         Route::put('/', 'save')->middleware('throttle:30,1')->name('save');
         Route::get('/voice-sample', 'voiceSample')->middleware('throttle:media-previews')->name('voice-sample');
+        Route::put('/email', 'changeEmail')->middleware('throttle:6,1')->name('email');
+        Route::put('/password', 'changePassword')->middleware('throttle:6,1')->name('password');
+        Route::post('/photo', 'savePhoto')->middleware('throttle:10,1')->name('photo');
+        Route::delete('/photo', 'removePhoto')->middleware('throttle:10,1')->name('photo.remove');
+        Route::get('/avatar', 'avatar')->middleware('throttle:120,1')->name('avatar');
+        Route::post('/devices/sign-out-others', 'signOutOtherDevices')->middleware('throttle:6,1')->name('devices.others');
+        Route::delete('/devices/{device}', 'signOutDevice')->where('device', '[a-f0-9]{32}')->middleware('throttle:20,1')->name('devices.destroy');
         Route::post('/presets', 'storePreset')->middleware('throttle:30,1')->name('presets.store');
         Route::put('/presets/order', 'orderPresets')->middleware('throttle:60,1')->name('presets.order');
         Route::put('/presets/default', 'defaultPreset')->middleware('throttle:60,1')->name('presets.default');

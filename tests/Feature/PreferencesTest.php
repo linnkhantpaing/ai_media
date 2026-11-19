@@ -44,7 +44,8 @@ class PreferencesTest extends TestCase
     /** @return array<string, mixed> */
     private function payload(array $settings = [], array $dictionary = [], string $locale = 'en'): array
     {
-        return ['locale' => $locale, 'settings' => $this->settings($settings), 'name_dictionary' => $dictionary];
+        return ['locale' => $locale, 'settings' => $this->settings($settings), 'name_dictionary' => $dictionary,
+            'profile' => ['name' => $this->customer->name, 'display' => ['timezone' => null, 'date_format' => null, 'time_format' => null]]];
     }
 
     private function package(array $features): void
