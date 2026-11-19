@@ -15,6 +15,7 @@ use App\Models\UsageEvent;
 use App\Models\User;
 use App\Services\AdminNotifications;
 use App\Services\AuditTrail;
+use App\Services\CustomerNotifications;
 use App\Services\Media\ProviderSettings;
 use App\Services\Media\StorageSettings;
 use Illuminate\Auth\Events\Failed;
@@ -65,12 +66,21 @@ class AppServiceProvider extends ServiceProvider
         PaymentTransaction::saved(function ($record): void {
             if ($record->wasRecentlyCreated || $record->wasChanged(['status', 'revision'])) {
                 app(AdminNotifications::class)->payment($record);
+                if ($record->wasChanged('status')) {
+                    app(CustomerNotifications::class)->fromPayment($record);
+                }
             }
         });
-        PaymentRefund::saved(fn ($record) => app(AdminNotifications::class)->refund($record));
+        PaymentRefund::saved(function ($record): void {
+            app(AdminNotifications::class)->refund($record);
+            if ($record->wasRecentlyCreated || $record->wasChanged('status')) {
+                app(CustomerNotifications::class)->fromRefund($record);
+            }
+        });
         MediaTask::saved(function ($record): void {
             if ($record->wasRecentlyCreated || $record->wasChanged('status')) {
                 app(AdminNotifications::class)->task($record);
+                app(CustomerNotifications::class)->fromTask($record);
             }
         });
         CustomerPackageAssignment::saved(fn () => Cache::forget('admin-notifications-synced'));

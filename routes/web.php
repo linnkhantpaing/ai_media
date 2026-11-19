@@ -5,6 +5,7 @@ use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\NewPasswordController;
 use App\Http\Controllers\Auth\PasswordResetLinkController;
 use App\Http\Controllers\CustomerBillingController;
+use App\Http\Controllers\CustomerNotificationController;
 use App\Http\Controllers\CustomerPlanController;
 use App\Http\Controllers\CustomerQueueController;
 use App\Http\Controllers\CustomerSupportController;
@@ -61,6 +62,9 @@ Route::middleware(['auth:web', EnsureCustomerAccess::class, 'auth.session', Ensu
         Route::get('/{payment}/receipts/{receipt}', 'receipt')->whereNumber('payment')->whereUuid('receipt')->name('receipt');
         Route::get('/{payment}/qr', 'paymentQr')->whereNumber('payment')->name('payment-qr');
     });
+    Route::get('/notifications', [CustomerNotificationController::class, 'index'])->name('notifications.index');
+    Route::get('/notifications/feed', [CustomerNotificationController::class, 'feed'])->middleware('throttle:120,1')->name('notifications.feed');
+    Route::post('/notifications/action', [CustomerNotificationController::class, 'action'])->middleware('throttle:60,1')->name('notifications.action');
     Route::get('/account/plan', [CustomerPlanController::class, 'index'])->name('account.plan');
     Route::get('/account/plan/exports/{run}', [CustomerPlanController::class, 'show'])->whereUuid('run')->name('account.plan.export');
     Route::get('/projects', [MediaProjectController::class, 'index'])->name('projects.index');

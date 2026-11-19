@@ -1,5 +1,5 @@
 export type Locale = 'my' | 'en' | 'th';
-export type FrameKey = 'billing' | 'myPlan' | 'dashboard' | 'newProject' | 'allProjects' | 'drafts' | 'awaitingReview' | 'processing' | 'completed' | 'needsAttention' | 'jobMonitor' | 'workerHealth' | 'preferences' | 'apiKeysModels' | 'projectDefaults' | 'storageRetention' | 'projectSetup' | 'scriptReview' | 'previewStudio' | 'projectProcessing' | 'projectResult';
+export type FrameKey = 'notifications' | 'billing' | 'myPlan' | 'dashboard' | 'newProject' | 'allProjects' | 'drafts' | 'awaitingReview' | 'processing' | 'completed' | 'needsAttention' | 'jobMonitor' | 'workerHealth' | 'preferences' | 'apiKeysModels' | 'projectDefaults' | 'storageRetention' | 'projectSetup' | 'scriptReview' | 'previewStudio' | 'projectProcessing' | 'projectResult';
 
 export interface SharedData {
     [key: string]: unknown;
@@ -9,6 +9,7 @@ export interface SharedData {
     queueFeed?: string | null;
     supportFeed?: string | null;
     notificationLinks?: {index:string;feed:string;action:string}|null;
+    customerNotifications?: {index:string;feed:string;action:string}|null;
     adminLinks?: Record<string, string>;
     frameLinks: Partial<Record<FrameKey, string>>;
     links: {

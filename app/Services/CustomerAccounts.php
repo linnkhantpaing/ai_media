@@ -210,6 +210,7 @@ class CustomerAccounts
                 }
             } elseif ($action === 'reset_password') {
                 $user->password = Hash::make($data['password']);
+                app(CustomerNotifications::class)->notify($user->id, 'password_changed', ['by' => 'admin'], 'password:'.$user->id.':admin:'.now()->timestamp);
                 $this->revoke($user);
             } elseif ($action === 'revoke_sessions') {
                 $this->revoke($user);

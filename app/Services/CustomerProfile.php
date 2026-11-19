@@ -118,6 +118,7 @@ class CustomerProfile
             DB::table('password_reset_tokens')->where('email', $user->email)->delete();
             $user->forceFill(['email' => $email, 'email_verified_at' => null])->save();
             $this->event($user, 'self_email_changed', ['fields' => ['email']]);
+            app(CustomerNotifications::class)->notify($user->id, 'email_changed', ['by' => 'you'], 'email:'.$user->id.':'.now()->timestamp);
         });
     }
 
@@ -130,6 +131,7 @@ class CustomerProfile
         DB::transaction(function () use ($user, $password): void {
             $user->forceFill(['password' => Hash::make($password), 'password_changed_at' => now()])->save();
             $this->event($user, 'self_password_changed', []);
+            app(CustomerNotifications::class)->notify($user->id, 'password_changed', ['by' => 'you'], 'password:'.$user->id.':'.now()->timestamp);
         });
     }
 

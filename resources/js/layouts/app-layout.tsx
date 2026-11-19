@@ -11,6 +11,7 @@ import { StudioIcon } from '@/components/studio-icon';
 import { StudioBreadcrumb } from '@/components/studio-breadcrumb';
 import {CustomerQueue} from '@/components/customer-queue';
 import {CustomerSupport} from '@/components/customer-support';
+import {CustomerNotificationBell} from '@/components/customer-notifications';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { navigation, isWorkflow, isLibrary, workflow } from '@/lib/navigation';
 import { useTranslations } from '@/lib/i18n';
@@ -174,10 +175,7 @@ export default function AppLayout({ children, frame, breadcrumbLabel, area = 'us
                 <button type="button" className="studio-search-trigger" aria-label={t('searchPages')} aria-haspopup="dialog" onClick={() => setSearch(true)}><StudioIcon name="search" /><span>{t('searchPages')}</span><kbd>Ctrl K</kbd></button>
                 <div className="studio-header-controls">
                     <LocaleSwitcher iconOnly={!adminArea}/>{adminArea?<ThemeToggle compact/>:<div className="user-header-communications"><CustomerQueue/><CustomerSupport/></div>}
-                    {adminArea ? <AdminNotificationBell/> : <details className="studio-header-menu notifications-menu">
-                        <summary className="icon-button" aria-label={t('notifications')} title={t('notifications')}><StudioIcon name="bell" /></summary>
-                        <div className="studio-popover notifications-popover"><p className="popover-heading">{t('notifications')}</p><div className="notification-empty"><StudioIcon name="bell" /><strong>{t('noNotifications')}</strong><p>{t('notificationsDetail')}</p></div></div>
-                    </details>}
+                    {adminArea ? <AdminNotificationBell/> : <CustomerNotificationBell/>}
                     {adminArea ? (onPrimaryAction ? <button type="button" className="studio-header-action" onClick={onPrimaryAction}><StudioIcon name="plus" /><span>{primaryActionLabel ?? adminText('users')}</span></button> : <Link href={adminLinks?.users ?? links.workspace} className="studio-header-action"><StudioIcon name="users" /><span>{adminText('users')}</span></Link>) : <Link href={frameLinks.newProject!} className="studio-header-action" title={t('newProject')}><StudioIcon name="plus" /><span>{t('newProject')}</span></Link>}
                     <details className="studio-header-menu profile-menu">
                         <summary className="studio-profile" aria-label={t('accountMenu')}>

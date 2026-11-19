@@ -37,6 +37,7 @@ export default function Billing({overview:o,payments,filters,counts,pending}:Bil
  useEffect(()=>setQuery(filters.q),[filters.q]);
  useEffect(()=>()=>{sequence.current++;},[]);
  async function show(payment:BillingPayment){const turn=++sequence.current;setOpening(true);try{const result=await mediaApi<BillingPayment>(api+'/'+payment.id);if(turn===sequence.current){setDetail(result);setDetailOpen(true);}}catch{toast.error(t('failure'));}finally{if(turn===sequence.current)setOpening(false);}}
+ useEffect(()=>{const url=new URL(window.location.href);const id=Number(url.searchParams.get('payment'));if(!Number.isInteger(id)||id<1)return;url.searchParams.delete('payment');window.history.replaceState(window.history.state,'',url);void show({id} as BillingPayment);},[]);
  async function pay(record:BillingPayment|null=null){const turn=++sequence.current;setOpening(true);try{const config=await mediaApi<BillingOptions>(api+'/options');if(turn!==sequence.current)return;if(config.pending&&!record){await show(config.pending);return;}setOptions(config);setEditing(record);setDetailOpen(false);setWizardInstance(value=>value+1);setWizard(true);}catch{toast.error(t('failure'));}finally{if(turn===sequence.current)setOpening(false);}}
  function completed(){setWizard(false);setEditing(null);navigate({},payments.current_page);}
  const page=payments.current_page,pages=Math.max(1,payments.last_page);

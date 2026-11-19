@@ -31,6 +31,7 @@ class HandleInertiaRequests extends Middleware
             'adminLinks' => $adminArea && $user?->is_admin ? ['support' => route('admin.support.index', absolute: false), 'usageReports' => route('admin.processing.index', absolute: false), 'revenue' => route('admin.revenue.index', absolute: false), 'notifications' => route('admin.notifications.index', absolute: false), 'audit' => route('admin.audit.index', absolute: false), 'generalSettings' => route('admin.settings.general', absolute: false), 'dashboard' => route('admin.dashboard', absolute: false), 'users' => route('admin.users.index', absolute: false), 'packages' => route('admin.packages.index', absolute: false), 'subscriptions' => route('admin.subscriptions.index', absolute: false), 'providers' => route('admin.settings.providers', absolute: false), 'storage' => route('admin.settings.storage', absolute: false), 'usageLedger' => route('admin.usage.index', absolute: false), 'payments' => route('admin.payments.index', absolute: false), 'paymentSettings' => route('admin.settings.payments', absolute: false), 'defaults' => route('admin.settings.defaults', absolute: false), 'jobMonitor' => route('admin.jobs.index', absolute: false), 'workerHealth' => route('admin.jobs.workers', absolute: false)] : [],
             'supportFeed' => ! $adminArea && $user && ! $user->is_admin ? route('support.chat', absolute: false) : null,
             'queueFeed' => ! $adminArea && $user ? route('media.queue.feed', absolute: false) : null,
+            'customerNotifications' => $customer ? ['feed' => route('notifications.feed', absolute: false), 'action' => route('notifications.action', absolute: false), 'index' => route('notifications.index', absolute: false)] : null,
             'notificationLinks' => $adminArea && $user?->is_admin ? ['index' => route('admin.notifications.index', absolute: false), 'feed' => route('admin.notifications.feed', absolute: false), 'action' => route('admin.notifications.action', absolute: false)] : null,
             'frameLinks' => [
                 'dashboard' => route('workspace', absolute: false),
@@ -42,6 +43,7 @@ class HandleInertiaRequests extends Middleware
                 ])->map(fn (string $status) => route('projects.index', ['status' => $status], absolute: false))->all(),
                 'myPlan' => route('account.plan', absolute: false),
                 'billing' => route('account.billing', absolute: false),
+                'notifications' => route('notifications.index', absolute: false),
                 'preferences' => route('settings.preferences', absolute: false),
                 ...collect([
                     'projectSetup' => 'setup', 'scriptReview' => 'script', 'previewStudio' => 'preview',
