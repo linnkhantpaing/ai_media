@@ -23,7 +23,7 @@ import {useToast} from '@/lib/toast';
 import type {MediaLine,MediaPageProps,MediaPreview,MediaProject,MediaSettings} from '@/types/media';
 import '../../css/recap-studio.css';
 import '../../css/recap-source-style.css';
-import {renderDefaults as defaults,studioStart as studio} from '@/lib/studio-defaults';
+import {renderDefaults as defaults,studioStart as studio,outputsFor} from '@/lib/studio-defaults';
 const narrationStyles=[['standard','Standard'],['storyteller','Storyteller'],['suspense','Suspense'],['punchy','Fast & Punchy'],['emotional','Emotional'],['funny','Funny'],['documentary','Documentary'],['custom','Custom']] as const;
 function Button({children,onClick,icon,primary=false,disabled=false,danger=false}:{children:ReactNode;onClick:()=>void;icon?:IconName;primary?:boolean;disabled?:boolean;danger?:boolean}){return <button type="button" className={'media-button'+(primary?' primary':'')+(danger?' danger':'')} onClick={onClick} disabled={disabled} title={typeof children==='string'?children:undefined}>{icon&&<StudioIcon name={icon}/ >}<span className="recap-action-label">{children}</span></button>}
 /** Package feature that allows each creation workflow. */
@@ -31,11 +31,15 @@ const workflowFeature={movie:'movie',translate:'dub',subtitles:'subs'} as const;
 /** Personal default workflow when the package allows it, otherwise the first allowed workflow. */
 function startWorkflow(features?:Record<string,boolean>|null,preferred?:string){const choice=(['movie','translate','subtitles'] as const).find(key=>key===preferred&&features?.[workflowFeature[key]]!==false);return choice?{workflow:choice,mode:choice==='subtitles'?'subs' as const:'dub' as const}:initialWorkflow(features);}
 function initialWorkflow(features?:Record<string,boolean>|null){const workflow=(['movie','translate','subtitles'] as const).find(key=>features?.[workflowFeature[key]]!==false)??'movie';return {workflow,mode:workflow==='subtitles'?'subs' as const:'dub' as const};}
+/** Creation type picked on the dashboard Quick Start (?workflow=movie|translate|subtitles). */
+function requestedWorkflow(props:MediaPageProps):string|undefined{if(props.initialProject)return undefined;const value=new URLSearchParams(window.location.search).get('workflow');return value&&['movie','translate','subtitles'].includes(value)?value:undefined;}
+/** A workflow picked from Quick Start can differ from the saved default; keep its output valid. */
+function fitOutput(settings:MediaSettings):MediaSettings{const workflow=settings.workflow;return workflow&&!outputsFor(workflow).includes(settings.output)?{...settings,output:'burn'}:settings;}
 const planCodes=['subscription_unavailable','feature_unavailable'];
 export default function RecapStudio(props:MediaPageProps&{initialStep:1|2}){
  const t=useRecapText(),{error,locale}=useMediaText(),toast=useToast();const upload=useRecapSource(props),{project,setProject,title,setTitle}=upload;
  const [step,setStep]=useState(()=>(props.initialProject&&new URLSearchParams(window.location.search).get('studio')==='render'||props.initialStep===2&&props.initialProject?.run?.phase==='generate'||props.initialProject?.status==='completed')?3:props.initialStep);
- const [settings,setSettings]=useState<MediaSettings>(()=>syncAudioControls({...defaults,...props.studioDefaults,...studio,name_dictionary:props.studioDefaults?.name_dictionary??[],...props.personalDefaults,...startWorkflow(props.features,props.personalDefaults?.workflow),review_before_render:true,...props.initialProject?.settings,fit_script_to_speed:true}));
+ const [settings,setSettings]=useState<MediaSettings>(()=>fitOutput(syncAudioControls({...defaults,...props.studioDefaults,...studio,name_dictionary:props.studioDefaults?.name_dictionary??[],...props.personalDefaults,...startWorkflow(props.features,requestedWorkflow(props)??props.personalDefaults?.workflow),review_before_render:true,...props.initialProject?.settings,fit_script_to_speed:true})));
  const [compactReview,setCompactReview]=useState(()=>window.matchMedia('(max-width: 800px)').matches);
  useEffect(()=>{const media=window.matchMedia('(max-width: 800px)');const update=()=>setCompactReview(media.matches);update();media.addEventListener('change',update);return()=>media.removeEventListener('change',update);},[]);
  const [editingTitle,setEditingTitle]=useState(false);

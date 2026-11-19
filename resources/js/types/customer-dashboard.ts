@@ -1,0 +1,31 @@
+import type {NotificationFeed} from '@/types/customer-notifications';
+
+export type DashboardMetric={total:number|null;used:number;reserved:number;available:number|null;exceeded:number};
+export type DashboardWorkflow='movie'|'translate'|'subtitles';
+export type DashboardPlan={
+ package:{id:number;name:string;code:string;type:string;version:number}|null;
+ status:'active'|'expired'|'ended'|'cancelled'|'upcoming'|'replaced'|'none'|'suspended';
+ expiring:boolean;start:string|null;end:string|null;days_left:number;
+ next:{package:{name:string};start:string;end:string}|null;
+ pending_payment:boolean;processing:DashboardMetric;videos:DashboardMetric;storage:DashboardMetric;
+ jobs:{running:number;queued:number};testing:boolean;
+ workflows:Record<DashboardWorkflow,boolean>;preset:{id:number;name:string}|null;
+};
+export type DashboardAction={kind:'plan_expired'|'no_plan'|'payment_info'|'export_failed'|'scripts_ready'|'plan_expiring'|'processing_over'|'processing_low'|'storage_full';
+ tone:'red'|'amber'|'purple';data:Record<string,string|number|null>;url:string;key:string};
+export type DashboardProject={id:string;title:string;type:DashboardWorkflow;poster:string|null;source:'youtube'|'upload'};
+export type WorkItem=DashboardProject&{state:'running'|'queued'|'retrying'|'review'|'failed'|'preparing'|'draft';
+ stage:'stopping'|'rendering'|'writing'|'importing'|'uploading'|'validating'|null;progress:number|null;duration:number;
+ error:string|null;url:string;cancel:string|null;retry:string|null;updated_at:string};
+export type DashboardWork={total:number;items:WorkItem[];progress:{total:number;rendering:number;writing:number;queued:number;stopping:number}};
+export type RecentProject=DashboardProject&{duration:number;completed_at:string;url:string;video:string|null;subtitles:string|null;audio:string|null;audio_format:string|null};
+export type ChecklistStep='account'|'upload'|'review'|'export'|'defaults';
+export type DashboardChecklist={steps:Record<ChecklistStep,boolean>}|null;
+export type BillingRow={id:number;code:string;status:string;currency:string;amount_minor:number;at:string};
+export type DashboardBilling={last:BillingRow|null;pending:BillingRow|null;any:boolean};
+export type UsageRange='14'|'30'|'all';
+export type DashboardUsage={range:UsageRange;unit:'day'|'month';bars:{date:string;seconds:number;videos:number}[];total_seconds:number;videos:number};
+export type DashboardSection='plan'|'actions'|'work'|'recent'|'checklist'|'billing'|'notifications'|'usage';
+export type DashboardData={errors:DashboardSection[];plan?:DashboardPlan|null;actions?:DashboardAction[]|null;work?:DashboardWork|null;recent?:RecentProject[]|null;
+ checklist?:DashboardChecklist;billing?:DashboardBilling|null;notifications?:NotificationFeed|null;usage?:DashboardUsage|null};
+export type DashboardProps={dashboard:DashboardData;dashboardLinks:{live:string;usage:string;checklist:string}};

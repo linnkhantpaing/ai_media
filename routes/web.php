@@ -5,6 +5,7 @@ use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\NewPasswordController;
 use App\Http\Controllers\Auth\PasswordResetLinkController;
 use App\Http\Controllers\CustomerBillingController;
+use App\Http\Controllers\CustomerDashboardController;
 use App\Http\Controllers\CustomerNotificationController;
 use App\Http\Controllers\CustomerPlanController;
 use App\Http\Controllers\CustomerQueueController;
@@ -38,7 +39,10 @@ Route::middleware('guest:web')->group(function (): void {
 Route::post('/locale', LocaleController::class)->middleware('throttle:locale-switch')->name('locale.update');
 
 Route::middleware(['auth:web', EnsureCustomerAccess::class, 'auth.session', EnsurePlatformAvailable::class])->group(function (): void {
-    Route::inertia('/', 'workspace')->name('workspace');
+    Route::get('/', [CustomerDashboardController::class, 'index'])->name('workspace');
+    Route::get('/dashboard/live', [CustomerDashboardController::class, 'live'])->middleware('throttle:120,1')->name('dashboard.live');
+    Route::get('/dashboard/usage', [CustomerDashboardController::class, 'usage'])->middleware('throttle:60,1')->name('dashboard.usage');
+    Route::post('/dashboard/checklist/hide', [CustomerDashboardController::class, 'hideChecklist'])->middleware('throttle:20,1')->name('dashboard.checklist');
     Route::prefix('support-api')->name('support.')->group(function (): void {
         Route::get('/chat', [CustomerSupportController::class, 'chat'])->name('chat');
         Route::post('/chat/messages', [CustomerSupportController::class, 'sendChat'])->middleware('throttle:20,1')->name('chat.send');

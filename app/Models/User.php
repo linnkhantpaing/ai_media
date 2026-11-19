@@ -44,6 +44,7 @@ class User extends Authenticatable
             'studio_preferences' => 'array',
             'display_preferences' => 'array',
             'password_changed_at' => 'datetime',
+            'dashboard_checklist_hidden_at' => 'datetime',
         ];
     }
 }

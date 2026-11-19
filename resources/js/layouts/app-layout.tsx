@@ -15,6 +15,7 @@ import {CustomerNotificationBell} from '@/components/customer-notifications';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { navigation, isWorkflow, isLibrary, workflow } from '@/lib/navigation';
 import { useTranslations } from '@/lib/i18n';
+import { useDashboardText } from '@/lib/customer-dashboard-i18n';
 import type { FrameKey, SharedData } from '@/types';
 
 const desktopQuery = '(min-width: 1024px)';
@@ -41,7 +42,7 @@ function Sidebar({ frame, mobile = false, adminArea = false, adminPage = 'dashbo
     adminPage?: string;
     onNavigate: () => void;
 }) {
-    const { auth, links, frameLinks } = usePage<SharedData>().props;
+    const { auth, links, frameLinks, planBadge } = usePage<SharedData>().props;
     const { t } = useTranslations();
     const { t: adminText } = useAdminTranslations();
     const footerTitle = adminArea ? adminText('phase') : t('phaseOne');
@@ -85,16 +86,27 @@ function Sidebar({ frame, mobile = false, adminArea = false, adminPage = 'dashbo
                 })}
             </div>
         </nav>}
-        <div className="studio-sidebar-footer">
+        {!adminArea && planBadge ? <div className="studio-sidebar-footer"><PlanFooter badge={planBadge} href={frameLinks.myPlan ?? links.workspace} onNavigate={onNavigate} /></div> : <div className="studio-sidebar-footer">
             <div className="studio-footer-row" title={footerTitle}>
                 <span className="studio-footer-icon"><StudioIcon name="shield" /></span>
                 <div><strong>{footerTitle}</strong><small>{t(auth.user?.is_admin ? 'adminAccess' : 'memberAccess')}</small></div>
                 <span className="studio-version">{adminArea ? 'V2' : 'V1'}</span>
             </div>
-        </div>
+        </div>}
     </>;
 }
 
+
+/** Customer sidebar footer: current plan with its state, linking to My Plan. */
+function PlanFooter({ badge, href, onNavigate }: { badge: NonNullable<SharedData['planBadge']>; href: string; onNavigate: () => void }) {
+    const { t } = useDashboardText();
+    const status = badge.status === 'active' ? t('p_active') + ' · ' + (badge.days_left > 0 ? t('daysLeft', { n: badge.days_left }) : t('dayLeft')) : badge.status === 'upcoming' ? t('p_upcoming') : badge.name ? t('p_expired') : t('choosePlan');
+    const title = badge.name ? t('planFooter', { name: badge.name }) : t('noPlan');
+    return <Link href={href} className={'studio-footer-row studio-plan-footer is-' + (badge.status === 'active' ? 'active' : badge.name ? 'ended' : 'none')} title={title + ' · ' + status} onClick={onNavigate}>
+        <span className="studio-footer-icon"><StudioIcon name="crown" /></span>
+        <div><strong>{title}</strong><small>{status}</small></div>
+    </Link>;
+}
 
 export default function AppLayout({ children, frame, breadcrumbLabel, area = 'user', adminPage = 'dashboard', onPrimaryAction, primaryActionLabel }: PropsWithChildren<{ frame: FrameKey; breadcrumbLabel?: string; area?: 'user' | 'admin'; adminPage?: string; onPrimaryAction?: () => void; primaryActionLabel?: string }>) {
     const { auth, links, frameLinks, locale, adminLinks } = usePage<SharedData>().props;

@@ -2,6 +2,8 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\CustomerPackageAssignment;
+use App\Models\User;
 use App\Services\CustomerProfile;
 use App\Services\GeneralSettings;
 use Illuminate\Http\Request;
@@ -32,6 +34,7 @@ class HandleInertiaRequests extends Middleware
             'supportFeed' => ! $adminArea && $user && ! $user->is_admin ? route('support.chat', absolute: false) : null,
             'queueFeed' => ! $adminArea && $user ? route('media.queue.feed', absolute: false) : null,
             'customerNotifications' => $customer ? ['feed' => route('notifications.feed', absolute: false), 'action' => route('notifications.action', absolute: false), 'index' => route('notifications.index', absolute: false)] : null,
+            'planBadge' => $customer ? fn () => $this->planBadge($user) : null,
             'notificationLinks' => $adminArea && $user?->is_admin ? ['index' => route('admin.notifications.index', absolute: false), 'feed' => route('admin.notifications.feed', absolute: false), 'action' => route('admin.notifications.action', absolute: false)] : null,
             'frameLinks' => [
                 'dashboard' => route('workspace', absolute: false),
@@ -64,5 +67,18 @@ class HandleInertiaRequests extends Middleware
                 'passwordStore' => route('password.store', absolute: false),
             ],
         ];
+    }
+
+    /** Plan name and state for the sidebar footer. */
+    private function planBadge(User $user): array
+    {
+        $assignment = CustomerPackageAssignment::current()->where('user_id', $user->id)->first();
+        if (! $assignment) {
+            return ['name' => null, 'status' => 'none', 'days_left' => 0];
+        }
+        $status = $assignment->status();
+
+        return ['name' => $assignment->effectiveSnapshot()['name'] ?? null, 'status' => $status,
+            'days_left' => $status === 'active' ? max(0, (int) ceil(now()->diffInDays($assignment->ends_at, false))) : 0];
     }
 }

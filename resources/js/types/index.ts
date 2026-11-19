@@ -10,6 +10,7 @@ export interface SharedData {
     supportFeed?: string | null;
     notificationLinks?: {index:string;feed:string;action:string}|null;
     customerNotifications?: {index:string;feed:string;action:string}|null;
+    planBadge?: {name:string|null;status:string;days_left:number}|null;
     adminLinks?: Record<string, string>;
     frameLinks: Partial<Record<FrameKey, string>>;
     links: {

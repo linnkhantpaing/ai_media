@@ -38,6 +38,12 @@ function SupportChat({ endpoint }: { endpoint: string }) {
     const [loading, setLoading] = useState(true);
     const [olderBusy, setOlderBusy] = useState(false);
     const [newCount, setNewCount] = useState(0);
+    useEffect(() => {
+        const show = () => setOpen(true);
+        window.addEventListener('open-support-chat', show);
+        return () => window.removeEventListener('open-support-chat', show);
+    }, []);
+    useEffect(() => { window.dispatchEvent(new CustomEvent('support-unread', { detail: unread })); }, [unread]);
     const [awayFromBottom, setAwayFromBottom] = useState(false);
     const [highlight, setHighlight] = useState<number | null>(null);
     const [error, setError] = useState('');
