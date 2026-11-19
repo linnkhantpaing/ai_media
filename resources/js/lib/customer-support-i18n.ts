@@ -37,6 +37,11 @@ const words = {
  save: ['Save edit', 'သိမ်းရန်', 'บันทึกการแก้ไข'],
  reply: ['Reply', 'ပြန်ဖြေရန်', 'ตอบกลับ'],
  changeFailed: ['Could not update the message. Please retry.', 'စာကို ပြင်ဆင်၍မရပါ။ ပြန်စမ်းပါ။', 'แก้ไขข้อความไม่สำเร็จ โปรดลองอีกครั้ง'],
+ admin: ['Admin', 'Admin', 'แอดมิน'],
+ loadingOlder: ['Loading earlier messages', 'ယခင်စာများ ဖွင့်နေသည်', 'กำลังโหลดข้อความก่อนหน้า'],
+ historyStart: ['Start of your conversation', 'စကားဝိုင်း၏ အစ', 'จุดเริ่มต้นของการสนทนา'],
+ jumpLatest: ['Jump to latest', 'နောက်ဆုံးစာသို့', 'ไปยังข้อความล่าสุด'],
+ jumpToOriginal: ['Go to original message', 'မူရင်းစာသို့ သွားရန်', 'ไปยังข้อความต้นฉบับ'],
  messageUnavailable: ['This message is no longer available.', 'ဤစာကို အသုံးပြု၍မရတော့ပါ။', 'ข้อความนี้ไม่พร้อมใช้งานแล้ว'],
 } as const;
 export function useCustomerSupportText() {

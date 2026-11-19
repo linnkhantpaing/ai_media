@@ -37,7 +37,9 @@ function SupportChat({ endpoint }: { endpoint: string }) {
     const [hasOlder, setHasOlder] = useState(false);
     const [loading, setLoading] = useState(true);
     const [olderBusy, setOlderBusy] = useState(false);
-    const [newMessages, setNewMessages] = useState(false);
+    const [newCount, setNewCount] = useState(0);
+    const [awayFromBottom, setAwayFromBottom] = useState(false);
+    const [highlight, setHighlight] = useState<number | null>(null);
     const [error, setError] = useState('');
     const [body, setBody] = useState('');
     const [files, setFiles] = useState<File[]>([]);
@@ -52,6 +54,10 @@ function SupportChat({ endpoint }: { endpoint: string }) {
     const trigger = useRef<HTMLButtonElement>(null);
     const panel = useRef<HTMLDivElement>(null);
     const scroller = useRef<HTMLDivElement>(null);
+    const thread = useRef<HTMLDivElement>(null);
+    const hasOlderRef = useRef(false);
+    hasOlderRef.current = hasOlder;
+    const highlightTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
     const input = useRef<HTMLTextAreaElement>(null);
     const picker = useRef<HTMLInputElement>(null);
     const menuElement = useRef<HTMLDivElement>(null);
@@ -73,13 +79,28 @@ function SupportChat({ endpoint }: { endpoint: string }) {
     const menuRef = useRef<MenuAnchor | null>(null);
     menuRef.current = menu;
 
-    const scrollBottom = useCallback(() => {
+    const scrollBottom = useCallback((smooth = false) => {
+        nearBottom.current = true;
         requestAnimationFrame(() => {
-            if (scroller.current) scroller.current.scrollTop = scroller.current.scrollHeight;
-            nearBottom.current = true;
-            setNewMessages(false);
+            const element = scroller.current;
+            if (element) element.scrollTo({ top: element.scrollHeight, behavior: smooth ? 'smooth' : 'auto' });
+            setNewCount(0);
+            setAwayFromBottom(false);
         });
     }, []);
+
+    // Keep the newest message in view while pinned to the bottom, even when
+    // images or fonts finish loading after the first render.
+    useLayoutEffect(() => {
+        const content = thread.current;
+        if (!open || !content || typeof ResizeObserver === 'undefined') return;
+        const observer = new ResizeObserver(() => {
+            const element = scroller.current;
+            if (element && nearBottom.current) element.scrollTop = element.scrollHeight;
+        });
+        observer.observe(content);
+        return () => observer.disconnect();
+    }, [open, loading]);
 
     const acknowledge = useCallback(() => {
         const current = state.current;
@@ -115,6 +136,7 @@ function SupportChat({ endpoint }: { endpoint: string }) {
         return () => {
             mounted.current = false;
             clearTimeout(closeTimer.current);
+            clearTimeout(highlightTimer.current);
             olderRequest.current?.abort();
         };
     }, []);
@@ -163,9 +185,9 @@ function SupportChat({ endpoint }: { endpoint: string }) {
                 setError('');
                 setLoading(false);
                 if (replace) setHasOlder(result.has_older);
-                const incoming = result.messages.some(message => message.id > after);
-                if (replace || (incoming && nearBottom.current)) scrollBottom();
-                else if (incoming) setNewMessages(true);
+                const incoming = result.messages.filter(message => message.id > after);
+                if (replace || (incoming.length && nearBottom.current)) scrollBottom();
+                else if (incoming.length) setNewCount(count => count + incoming.filter(message => message.sender_kind === 'admin').length);
                 requestAnimationFrame(acknowledge);
                 if (result.has_newer) delay = 200;
             } catch (reason) {
@@ -281,32 +303,73 @@ function SupportChat({ endpoint }: { endpoint: string }) {
         return t(fallback);
     }
 
-    async function loadOlder() {
+    /** Loads the previous page, or everything down to `until` for a reply jump, keeping the visible position. */
+    async function loadOlder(until?: number): Promise<boolean> {
         const first = state.current.messages[0]?.id;
-        if (!first || !hasOlder || olderRequest.current) return;
+        if (!first || !hasOlderRef.current || olderRequest.current) return false;
         const controller = new AbortController();
         olderRequest.current = controller;
         setOlderBusy(true);
         try {
-            const result = await mediaApi<ChatPage>(endpoint + '?before=' + first, 'GET', undefined, controller.signal);
-            if (controller.signal.aborted || !mounted.current) return;
+            const result = await mediaApi<ChatPage>(endpoint + '?before=' + first + (until ? '&until=' + until : ''), 'GET', undefined, controller.signal);
+            if (controller.signal.aborted || !mounted.current) return false;
             const target = scroller.current;
             const height = target?.scrollHeight ?? 0;
             const top = target?.scrollTop ?? 0;
-            const rows = [...result.messages, ...state.current.messages];
+            const known = new Set(state.current.messages.map(message => message.id));
+            const rows = [...result.messages.filter(message => !known.has(message.id)), ...state.current.messages];
             state.current = { ...state.current, messages: rows };
+            hasOlderRef.current = result.has_older;
             setMessages(rows);
             setHasOlder(result.has_older);
             setError('');
-            requestAnimationFrame(() => { if (target) target.scrollTop = top + target.scrollHeight - height; });
+            await new Promise<void>(resolve => requestAnimationFrame(() => {
+                if (target) target.scrollTop = top + target.scrollHeight - height;
+                resolve();
+            }));
+            return true;
         } catch (reason) {
             if (!controller.signal.aborted && mounted.current) setError(describeError(reason, 'failed'));
+            return false;
         } finally {
             if (olderRequest.current === controller) {
                 olderRequest.current = null;
                 if (mounted.current) setOlderBusy(false);
             }
         }
+    }
+
+    // Messenger-style history: fetch the previous page as the reader nears the top,
+    // and keep filling while the loaded messages are shorter than the viewport.
+    function maybeLoadOlder() {
+        const element = scroller.current;
+        if (element && hasOlderRef.current && !olderRequest.current && element.scrollTop < 140) void loadOlder();
+    }
+
+    useEffect(() => {
+        if (!open || loading) return;
+        const frame = requestAnimationFrame(maybeLoadOlder);
+        return () => cancelAnimationFrame(frame);
+    });
+
+    /** Scrolls to a quoted message, loading older history first when needed. */
+    async function jumpTo(id: number) {
+        const find = () => scroller.current?.querySelector<HTMLElement>('[data-message-id="' + id + '"]') ?? null;
+        let element = find();
+        if (!element && hasOlderRef.current && id < (state.current.messages[0]?.id ?? 0)) {
+            if (olderRequest.current) { olderRequest.current.abort(); olderRequest.current = null; }
+            await loadOlder(id);
+            element = find();
+        }
+        if (!element) {
+            setSendError(t('messageUnavailable'));
+            return;
+        }
+        nearBottom.current = false;
+        element.scrollIntoView({ block: 'center', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+        setHighlight(id);
+        clearTimeout(highlightTimer.current);
+        highlightTimer.current = setTimeout(() => setHighlight(null), 1800);
     }
 
     function begin(kind: ComposerAction['kind'], message: Message) {
@@ -413,34 +476,44 @@ function SupportChat({ endpoint }: { endpoint: string }) {
                     <ActionTooltip label={t('close')}><button type="button" className="cs-icon" aria-label={t('close')} onClick={dismiss}><StudioIcon name="close" /></button></ActionTooltip>
                 </header>
                 {error && <div className="customer-support-error" role="alert"><StudioIcon name="alert" /><span>{error}</span><button type="button" onClick={() => refresh.current()}>{t('retry')}</button></div>}
-                <div ref={scroller} className="customer-support-messages" role="log" aria-label={t('support')} aria-live="polite" aria-relevant="additions" aria-busy={loading}
+                <div className="customer-support-thread-wrap">
+                <div ref={scroller} className="customer-support-messages" role="log" aria-label={t('support')} aria-live="polite" aria-relevant="additions" aria-busy={loading || olderBusy}
                     onScroll={() => {
                         if (!scroller.current) return;
                         setMenu(null);
                         const { scrollHeight, scrollTop, clientHeight } = scroller.current;
-                        nearBottom.current = scrollHeight - scrollTop - clientHeight < 55;
-                        if (nearBottom.current) { setNewMessages(false); acknowledge(); }
-                    }}>
-                    {loading ? <div className="customer-support-loading"><StudioIcon name="loader" className="spin" />{t('loading')}</div>
+                        const distance = scrollHeight - scrollTop - clientHeight;
+                        nearBottom.current = distance < 55;
+                        setAwayFromBottom(distance > 240);
+                        if (nearBottom.current) { setNewCount(0); acknowledge(); }
+                        maybeLoadOlder();
+                    }}
+                    onLoadCapture={() => { if (nearBottom.current && scroller.current) scroller.current.scrollTop = scroller.current.scrollHeight; }}>
+                    <div ref={thread} className="customer-support-thread">
+                    {loading ? <div className="customer-support-loading" role="status"><StudioIcon name="loader" className="spin" />{t('loading')}</div>
                         : !messages.length ? !error && <div className="customer-support-welcome"><span><StudioIcon name="chat" /></span><h3>{t('welcome')}</h3><p>{t('intro')}</p></div>
                             : <>
-                                {hasOlder && <button type="button" className="cs-text-button" disabled={olderBusy} onClick={() => void loadOlder()}>
-                                    {olderBusy && <StudioIcon name="loader" className="spin" />}{t('older')}
-                                </button>}
+                                {olderBusy ? <div className="cs-history-loading" role="status"><span className="cs-typing" aria-hidden="true"><i /><i /><i /></span>{t('loadingOlder')}</div>
+                                    : hasOlder ? <button type="button" className="cs-text-button" onClick={() => void loadOlder()}>{t('older')}</button>
+                                        : <div className="cs-history-start"><span>{t('historyStart')}</span></div>}
                                 {messages.map((message, index) => {
                                     const incoming = message.sender_kind === 'admin';
                                     const day = date.format(new Date(message.at));
                                     const time = clock.format(new Date(message.at));
                                     const dateBreak = index === 0 || date.format(new Date(messages[index - 1].at)) !== day;
-                                    return <div key={message.id}>
+                                    const previousMessage = messages[index - 1];
+                                    const grouped = !dateBreak && previousMessage?.sender_kind === message.sender_kind;
+                                    return <div key={message.id} data-message-id={message.id}>
                                         {dateBreak && <div className="customer-support-date"><span>{day}</span></div>}
-                                        <article className={'customer-support-message ' + (incoming ? 'is-admin' : 'is-customer') + (message.deleted ? ' is-deleted' : '')}>
+                                        <article className={'customer-support-message ' + (incoming ? 'is-admin' : 'is-customer') + (message.deleted ? ' is-deleted' : '') + (highlight === message.id ? ' is-highlighted' : '')}>
                                             {incoming && <span className="customer-support-message-avatar" aria-hidden="true"><StudioIcon name="shield" /></span>}
                                             <div className="customer-support-message-content">
-                                                {incoming && <small className="customer-support-sender">{t('administrator')}{message.sender && ' · ' + message.sender}</small>}
+                                                {incoming && !grouped && <small className="customer-support-sender">{t('admin')}</small>}
                                                 <div className="customer-support-bubble">
                                                     {message.deleted ? <p><StudioIcon name="ban" />{t('deleted')}</p> : <>
-                                                        {message.reply && <blockquote>{message.reply.deleted ? t('deleted') : message.reply.body || t('attachment')}</blockquote>}
+                                                        {message.reply && <button type="button" className="cs-quote" disabled={message.reply.deleted} title={t('jumpToOriginal')} onClick={() => void jumpTo(message.reply!.id)}>
+                                                            <span dir="auto">{message.reply.deleted ? t('deleted') : message.reply.body || t('attachment')}</span>
+                                                        </button>}
                                                         {message.body && <p dir="auto">{message.body}</p>}
                                                         {message.attachments.map(file => <a className="customer-support-attachment" key={file.id} href={file.url} target="_blank" rel="noopener noreferrer" aria-label={file.name}>
                                                             {file.mime.startsWith('image/') ? <img src={file.url} alt={file.name} loading="lazy" /> : <StudioIcon name="file" />}
@@ -448,7 +521,9 @@ function SupportChat({ endpoint }: { endpoint: string }) {
                                                         </a>)}
                                                     </>}
                                                 </div>
-                                                <time dateTime={message.at} title={day + ' · ' + time}>{time}{message.edited && ' · ' + t('edited')}</time>
+                                                <time dateTime={message.at} title={day + ' · ' + time + (message.edited && message.edited_at ? ' · ' + t('edited') + ' ' + clock.format(new Date(message.edited_at)) : '')}>
+                                                    {time}{message.edited && <span className="cs-edited"> · {t('edited')}</span>}
+                                                </time>
                                             </div>
                                             {!message.deleted && <button type="button" className="cs-message-actions" aria-label={t('actions')}
                                                 aria-expanded={menu?.id === message.id} aria-controls={menu?.id === message.id ? 'cs-message-menu' : undefined}
@@ -459,10 +534,14 @@ function SupportChat({ endpoint }: { endpoint: string }) {
                                     </div>;
                                 })}
                             </>}
+                    </div>
                 </div>
-                {newMessages && <button type="button" className="customer-support-new-messages" onClick={() => { scrollBottom(); requestAnimationFrame(acknowledge); }}>
-                    <StudioIcon name="chevron" />{t('newMessages')}
+                {(awayFromBottom || newCount > 0) && !loading && <button type="button" className="cs-jump-bottom" aria-label={t('jumpLatest') + (newCount ? ' · ' + newCount + ' ' + t('newMessages') : '')}
+                    title={t('jumpLatest')} onClick={() => { scrollBottom(true); setTimeout(acknowledge, 350); }}>
+                    <StudioIcon name="chevron" />
+                    {newCount > 0 && <span className="cs-jump-count">{newCount > 99 ? '99+' : newCount}</span>}
                 </button>}
+                </div>
                 <form className="customer-support-composer" onSubmit={event => void submit(event)}>
                     {sendError && <div className="customer-support-error cs-composer-error" role="alert">
                         <StudioIcon name="alert" /><span>{sendError}</span><button type="button" aria-label={t('dismiss')} onClick={() => setSendError('')}><StudioIcon name="close" /></button>

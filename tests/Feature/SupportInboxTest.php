@@ -206,7 +206,7 @@ class SupportInboxTest extends TestCase
             $this->postJson('/admin/support/'.$id.'/messages', ['kind' => 'reply', 'body' => 'Reply '.$i, 'request_id' => (string) Str::uuid()])->assertCreated();
         }
         $this->deleteJson('/admin/support/'.$id.'/messages/'.$first)->assertOk();
-        $this->getJson('/admin/support/'.$id)->assertJsonCount(60, 'messages')->assertJsonCount(0, 'deleted_ids');
+        $this->getJson('/admin/support/'.$id)->assertJsonCount(20, 'messages')->assertJsonCount(0, 'deleted_ids');
         $this->getJson('/admin/support/'.$id.'?loaded_from='.$first)->assertJsonPath('deleted_ids.0', $first);
     }
 
@@ -350,9 +350,22 @@ class SupportInboxTest extends TestCase
                 'body' => 'Message '.$i, 'request_id' => (string) Str::uuid(), 'fingerprint' => hash('sha256', (string) $i), 'created_at' => now(), 'updated_at' => now()];
         }
         DB::table('support_messages')->insert($messages);
-        $latest = $this->getJson('/admin/support/'.$id)->assertJsonCount(60, 'messages')->assertJsonPath('has_older', true);
-        $old = $this->getJson('/admin/support/'.$id.'?before='.$latest->json('messages.0.id'))->assertJsonCount(11, 'messages')->assertJsonPath('has_older', false);
-        $this->assertLessThan($latest->json('messages.0.id'), $old->json('latest_id'));
+        $total = DB::table('support_messages')->where('conversation_id', $id)->count();
+        $page = $this->getJson('/admin/support/'.$id)->assertJsonCount(20, 'messages')->assertJsonPath('has_older', true);
+        $ids = array_column($page->json('messages'), 'id');
+        while ($page->json('has_older')) {
+            $page = $this->getJson('/admin/support/'.$id.'?before='.$ids[0])->assertOk();
+            $this->assertLessThanOrEqual(20, count($page->json('messages')));
+            $this->assertLessThan($ids[0], $page->json('latest_id'));
+            $ids = [...array_column($page->json('messages'), 'id'), ...$ids];
+        }
+        $this->assertCount($total, array_unique($ids));
+        $sorted = $ids;
+        sort($sorted);
+        $this->assertSame($sorted, $ids);
+        $latest = $this->getJson('/admin/support/'.$id)->json('messages.0.id');
+        $this->getJson('/admin/support/'.$id.'?before='.$latest.'&until='.$ids[5])->assertJsonPath('messages.0.id', $ids[5])
+            ->assertJsonCount(count($ids) - 25, 'messages')->assertJsonPath('has_older', true);
     }
 
     public function test_inbox_search_filters_options_and_notification_are_real(): void
@@ -535,7 +548,65 @@ class SupportInboxTest extends TestCase
         }
         $this->deleteJson('/admin/support/'.$id.'/messages/'.$first)->assertOk();
         $this->actingAs($this->customer, 'web');
-        $this->getJson('/support-api/'.$id.'?loaded_from='.$first)->assertOk()->assertJsonPath('deleted_ids.0', (int) $first)->assertJsonCount(60, 'messages');
+        $this->getJson('/support-api/'.$id.'?loaded_from='.$first)->assertOk()->assertJsonPath('deleted_ids.0', (int) $first)->assertJsonCount(20, 'messages');
         $this->getJson('/support-api/'.$id.'?loaded_from=invalid')->assertUnprocessable();
+    }
+
+    public function test_admin_edits_own_messages_and_both_sides_see_them_as_edited(): void
+    {
+        $id = $this->conversation();
+        $reply = $this->getJson('/admin/support/'.$id)->assertJsonPath('messages.0.can_edit', true)->assertJsonPath('messages.0.edited', false)->json('messages.0.id');
+        $note = $this->postJson('/admin/support/'.$id.'/messages', ['kind' => 'note', 'body' => 'Private', 'request_id' => (string) Str::uuid()])->assertCreated()->json('id');
+        $incoming = $this->incoming($id, 'Customer text');
+        $this->actingAs($this->customer, 'web');
+        $snapshot = $this->getJson('/support-api/chat')->json('snapshot');
+        $this->actingAs($this->admin, 'admin');
+        $adminSnapshot = $this->getJson('/admin/support/'.$id)->assertJsonPath('messages.2.can_edit', false)->json('snapshot');
+        $this->travel(5)->seconds();
+
+        $this->patchJson('/admin/support/'.$id.'/messages/'.$incoming, ['body' => 'Not mine'])->assertForbidden();
+        $this->patchJson('/admin/support/'.$id.'/messages/'.$reply, ['body' => ' '])->assertUnprocessable();
+        $this->actingAs(User::factory()->create(['is_admin' => true]), 'admin')
+            ->patchJson('/admin/support/'.$id.'/messages/'.$reply, ['body' => 'Other admin'])->assertForbidden();
+        $this->actingAs($this->admin, 'admin');
+        $this->patchJson('/admin/support/'.$id.'/messages/'.$reply, ['body' => 'Updated answer'])->assertOk();
+        $this->patchJson('/admin/support/'.$id.'/messages/'.$note, ['body' => 'Updated note'])->assertOk();
+        $this->getJson('/admin/support/'.$id)->assertJsonPath('messages.0.body', 'Updated answer')->assertJsonPath('messages.0.edited', true)
+            ->assertJsonPath('messages.1.edited', true);
+
+        auth('admin')->logout();
+        $this->actingAs($this->customer, 'web');
+        $this->patchJson('/admin/support/'.$id.'/messages/'.$reply, ['body' => 'Customer try'])->assertUnauthorized();
+        $changes = $this->getJson('/support-api/chat?after='.$incoming.'&loaded_from='.$reply.'&since='.$snapshot)->assertOk()->json('changes');
+        $adminEdit = collect($changes)->firstWhere('id', $reply);
+        $this->assertNotContains($note, array_column($changes, 'id'));
+        $this->assertSame('Updated answer', $adminEdit['body']);
+        $this->assertTrue($adminEdit['edited']);
+        $this->assertNotNull($adminEdit['edited_at']);
+        $this->assertFalse($adminEdit['can_edit']);
+        $this->patchJson('/support-api/chat/messages/'.$incoming, ['body' => 'Customer edit'])->assertOk();
+
+        $this->actingAs($this->admin, 'admin');
+        $changes = $this->getJson('/admin/support/'.$id.'?loaded_from='.$reply.'&since='.$adminSnapshot)->assertJsonPath('reset', false)->json('changes');
+        $edited = collect($changes)->firstWhere('id', $incoming);
+        $this->assertSame('Customer edit', $edited['body']);
+        $this->assertTrue($edited['edited']);
+        $this->getJson('/admin/support/'.$id.'?before=5&since=1')->assertUnprocessable()->assertJsonValidationErrors('since');
+    }
+
+    public function test_customer_chat_pages_twenty_messages_and_loads_down_to_a_quoted_message(): void
+    {
+        $this->withoutMiddleware(ThrottleRequests::class);
+        $id = $this->conversation();
+        $first = DB::table('support_messages')->where('conversation_id', $id)->value('id');
+        for ($n = 0; $n < 44; $n++) {
+            $this->postJson('/admin/support/'.$id.'/messages', ['kind' => 'reply', 'body' => 'Reply '.$n, 'request_id' => (string) Str::uuid()])->assertCreated();
+        }
+        $this->actingAs($this->customer, 'web');
+        $latest = $this->getJson('/support-api/chat')->assertJsonCount(20, 'messages')->assertJsonPath('has_older', true);
+        $oldest = $latest->json('messages.0.id');
+        $this->getJson('/support-api/chat?before='.$oldest)->assertJsonCount(20, 'messages')->assertJsonPath('has_older', true);
+        $this->getJson('/support-api/chat?before='.$oldest.'&until='.$first)->assertJsonCount(25, 'messages')
+            ->assertJsonPath('messages.0.id', $first)->assertJsonPath('has_older', false);
     }
 }

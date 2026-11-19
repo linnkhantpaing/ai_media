@@ -21,6 +21,25 @@ class SupportController extends Controller
             'files' => ['nullable', 'array', 'max:5'], 'files.*' => ['required', 'file', 'max:10240', 'mimes:jpg,jpeg,png,webp,pdf', 'extensions:jpg,jpeg,png,webp,pdf']];
     }
 
+    /** @return array<string, list<string>> */
+    public static function pageRules(): array
+    {
+        return ['before' => ['nullable', 'integer', 'min:1'], 'loaded_from' => ['nullable', 'integer', 'min:1'],
+            'until' => ['nullable', 'integer', 'min:1'],
+            'since' => ['nullable', 'integer', 'min:0', 'prohibits:before']];
+    }
+
+    /**
+     * @param  array<string, mixed>  $v
+     * @return array{before: ?int, loadedFrom: ?int, until: ?int, since: ?int}
+     */
+    public static function pageArguments(array $v): array
+    {
+        $int = fn (string $key): ?int => isset($v[$key]) ? (int) $v[$key] : null;
+
+        return ['before' => $int('before'), 'loadedFrom' => $int('loaded_from'), 'until' => $int('before') ? $int('until') : null, 'since' => $int('since')];
+    }
+
     public function index(Request $request, SupportInbox $inbox): Response|JsonResponse
     {
         $filters = $request->validate(['q' => ['nullable', 'string', 'max:100'], 'category' => ['nullable', Rule::in(SupportInbox::CATEGORIES)],
@@ -61,9 +80,9 @@ class SupportController extends Controller
 
     public function show(Request $request, SupportInbox $inbox, int $conversation): JsonResponse
     {
-        $v = $request->validate(['before' => ['nullable', 'integer', 'min:1'], 'loaded_from' => ['nullable', 'integer', 'min:1']]);
+        $v = $request->validate(SupportController::pageRules());
 
-        return response()->json($inbox->detail($request->user('admin'), $conversation, true, isset($v['before']) ? (int) $v['before'] : null, isset($v['loaded_from']) ? (int) $v['loaded_from'] : null))->header('Cache-Control', 'private, no-store');
+        return response()->json($inbox->detail($request->user('admin'), $conversation, true, ...SupportController::pageArguments($v)))->header('Cache-Control', 'private, no-store');
     }
 
     public function send(Request $request, SupportInbox $inbox, int $conversation): JsonResponse
@@ -72,6 +91,14 @@ class SupportController extends Controller
         $id = $inbox->send($request->user('admin'), $conversation, $data, $request->file('files', []));
 
         return response()->json(['id' => $id], 201)->header('Cache-Control', 'private, no-store');
+    }
+
+    public function editMessage(Request $request, SupportInbox $inbox, int $conversation, int $message): JsonResponse
+    {
+        $input = $request->validate(['body' => ['required', 'string', 'max:4000']]);
+        $inbox->editMessage($request->user('admin'), $conversation, $message, trim($input['body']));
+
+        return response()->json(['saved' => true])->header('Cache-Control', 'private, no-store');
     }
 
     public function destroyMessage(Request $request, SupportInbox $inbox, int $conversation, int $message): JsonResponse

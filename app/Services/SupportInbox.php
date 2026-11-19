@@ -7,6 +7,7 @@ use App\Models\MediaTask;
 use App\Models\PaymentTransaction;
 use App\Models\User;
 use Carbon\CarbonImmutable;
+use Carbon\CarbonInterface;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
@@ -23,6 +24,12 @@ class SupportInbox
     public const STATUSES = ['open', 'in_progress', 'waiting_customer', 'resolved'];
 
     public const PRIORITIES = ['normal', 'high', 'urgent'];
+
+    /** Messages returned per chat page, newest first, on both Admin and customer sides. */
+    public const PAGE_SIZE = 20;
+
+    /** Maximum messages returned when loading history down to a quoted message. */
+    private const HISTORY_LIMIT = 200;
 
     public function authorize(User $actor, int $id, bool $admin): object
     {
@@ -161,19 +168,21 @@ class SupportInbox
             'filters' => array_replace(['q' => '', 'category' => '', 'tab' => 'all', 'sort' => 'latest', 'page' => $page], $filters, ['page' => $page])];
     }
 
-    public function detail(User $actor, int $id, bool $admin = true, ?int $before = null, ?int $loadedFrom = null): array
+    /**
+     * One page of a conversation. "before" pages back through history; with
+     * "until" it returns everything down to that message (for reply jumps).
+     * "loaded_from" + "since" report deletions and edits in the loaded window.
+     */
+    public function detail(User $actor, int $id, bool $admin = true, ?int $before = null, ?int $loadedFrom = null, ?int $until = null, ?int $since = null): array
     {
         $c = $this->authorize($actor, $id, $admin);
+        $snapshot = now();
         $query = DB::table('support_messages as m')->leftJoin('users as s', 's.id', '=', 'm.sender_id')->where('m.conversation_id', $id);
         if (! $admin) {
             $query->where('m.kind', '!=', 'note');
         }
-        if ($before) {
-            $query->where('m.id', '<', $before);
-        }
-        $rows = $query->select('m.*', 's.name as sender_name')->orderByDesc('m.id')->limit(61)->get();
-        $hasOlder = $rows->count() > 60;
-        $rows = $rows->take(60)->reverse()->values();
+        $query->select('m.*', 's.name as sender_name');
+        [$rows, $hasOlder] = $this->page($query, $before, $until);
         $read = (int) DB::table('support_reads')->where('conversation_id', $id)->where('user_id', $actor->id)->value('last_message_id');
         $customerRead = (int) DB::table('support_reads')->where('conversation_id', $id)->where('user_id', $c->customer_id)->value('last_message_id');
         $messages = $this->messagePayloads($rows, $actor, $admin, $customerRead);
@@ -183,6 +192,9 @@ class SupportInbox
             $deletedQuery->where('kind', '!=', 'note');
         }
         $deletedIds = $deletedQuery->pluck('id')->map(fn ($value) => (int) $value)->all();
+        $changes = $loadedFrom && $since !== null && $before === null
+            ? $this->changedMessages($query, $loadedFrom, (int) ($rows->last()?->id ?? $loadedFrom), $since, $snapshot)
+            : collect();
         $user = User::findOrFail($c->customer_id);
         $context = $admin ? $this->customerContext($user) : null;
         $related = $this->related($c->customer_id, $c->related_type, $c->related_id, $admin);
@@ -192,7 +204,44 @@ class SupportInbox
             'created_at' => $this->iso($c->created_at), 'last_customer_at' => $this->iso($c->last_customer_at),
             'customer' => ['id' => $user->id, 'name' => $user->name, 'email' => $user->email],
             'messages' => $messages, 'deleted_ids' => $deletedIds, 'has_older' => $hasOlder, 'read_through' => $read,
+            'changes' => $changes->count() > 120 ? [] : $this->messagePayloads($changes, $actor, $admin, $customerRead),
+            'reset' => $changes->count() > 120, 'snapshot' => $snapshot->timestamp,
             'latest_id' => $rows->last()?->id ?? 0, 'context' => $context, 'related' => $related];
+    }
+
+    /**
+     * Newest-first page of messages returned in chronological order.
+     *
+     * @return array{0: Collection<int, object>, 1: bool}
+     */
+    private function page(Builder $query, ?int $before, ?int $until): array
+    {
+        $page = clone $query;
+        if ($before) {
+            $page->where('m.id', '<', $before);
+        }
+        if ($until && $before) {
+            $page->where('m.id', '>=', $until);
+        }
+        $rows = $page->orderByDesc('m.id')->limit($until && $before ? self::HISTORY_LIMIT : self::PAGE_SIZE)->get()->reverse()->values();
+        $hasOlder = $rows->isNotEmpty() && (clone $query)->where('m.id', '<', $rows->first()->id)->exists();
+
+        return [$rows, $hasOlder];
+    }
+
+    /**
+     * Loaded messages edited (or whose quoted message changed) since the client's snapshot.
+     *
+     * @return Collection<int, object>
+     */
+    private function changedMessages(Builder $query, int $from, int $to, int $since, CarbonInterface $snapshot): Collection
+    {
+        $floor = CarbonImmutable::createFromTimestampUTC(min($since, $snapshot->timestamp))->subSeconds(15);
+
+        return (clone $query)->leftJoin('support_messages as quoted', 'quoted.id', '=', 'm.reply_to')
+            ->whereBetween('m.id', [$from, $to])
+            ->where(fn (Builder $items) => $items->where('m.updated_at', '>=', $floor)->orWhere('quoted.updated_at', '>=', $floor))
+            ->orderByDesc('m.id')->limit(121)->get();
     }
 
     private function messagePayloads(Collection $rows, User $actor, bool $admin, int $customerRead = 0): array
@@ -209,11 +258,13 @@ class SupportInbox
             $reply = $references->get($message->reply_to);
             $deleted = $message->deleted_at !== null;
             $mine = $message->sender_id === $actor->id && $message->sender_kind === ($admin ? 'admin' : 'customer');
+            $edited = ! $deleted && $message->kind !== 'event' && $message->updated_at > $message->created_at;
 
             return ['id' => $message->id, 'kind' => $message->kind, 'sender_kind' => $message->sender_kind, 'sender' => $message->sender_name,
-                'body' => $deleted ? '' : $message->body, 'deleted' => $deleted, 'edited' => ! $deleted && $message->updated_at > $message->created_at,
+                'body' => $deleted ? '' : $message->body, 'deleted' => $deleted, 'edited' => $edited,
+                'edited_at' => $edited ? $this->iso($message->updated_at) : null,
                 'can_delete' => $mine && ! $deleted && $message->kind !== 'event',
-                'can_edit' => ! $admin && $mine && ! $deleted && $message->kind === 'reply' && filled($message->body),
+                'can_edit' => $mine && ! $deleted && in_array($message->kind, $admin ? ['reply', 'note'] : ['reply'], true) && filled($message->body),
                 'event' => $message->event ? json_decode($message->event, true) : null, 'at' => $this->iso($message->created_at),
                 'request_id' => $message->request_id,
                 'read_by_customer' => $message->kind === 'reply' && $message->sender_kind === 'admin' && $customerRead >= $message->id,
@@ -247,39 +298,29 @@ class SupportInbox
             ->whereRaw('m.id > COALESCE(r.last_message_id, 0)')->count();
     }
 
-    public function customerChat(User $actor, ?int $before, ?int $after, ?int $loadedFrom, ?int $since): array
+    public function customerChat(User $actor, ?int $before, ?int $after, ?int $loadedFrom, ?int $since, ?int $until = null): array
     {
         $snapshot = now();
         $query = $this->customerMessages($actor)->leftJoin('users as s', 's.id', '=', 'm.sender_id')
             ->select('m.*', 's.name as sender_name');
-        $page = clone $query;
-        if ($before) {
-            $page->where('m.id', '<', $before);
-        }
+        $hasNewer = false;
+        $hasOlder = false;
         if ($after !== null) {
-            $page->where('m.id', '>', $after)->orderBy('m.id');
+            $raw = (clone $query)->where('m.id', '>', $after)->orderBy('m.id')->limit(self::PAGE_SIZE + 1)->get();
+            $hasNewer = $raw->count() > self::PAGE_SIZE;
+            $rows = $raw->take(self::PAGE_SIZE)->values();
         } else {
-            $page->orderByDesc('m.id');
+            [$rows, $hasOlder] = $this->page($query, $before, $until);
         }
-        $raw = $page->limit(61)->get();
-        $rows = $raw->take(60);
-        if ($after === null) {
-            $rows = $rows->reverse();
-        }
-        $changes = collect();
-        if ($after !== null && $loadedFrom && $since !== null) {
-            $floor = CarbonImmutable::createFromTimestampUTC(min($since, $snapshot->timestamp))->subSeconds(15);
-            $changes = (clone $query)->leftJoin('support_messages as quoted', 'quoted.id', '=', 'm.reply_to')
-                ->whereBetween('m.id', [$loadedFrom, $after])
-                ->where(fn (Builder $items) => $items->where('m.updated_at', '>=', $floor)->orWhere('quoted.updated_at', '>=', $floor))
-                ->orderByDesc('m.id')->limit(121)->get();
-        }
+        $changes = $after !== null && $loadedFrom && $since !== null
+            ? $this->changedMessages($query, $loadedFrom, $after, $since, $snapshot)
+            : collect();
 
         return ['messages' => $this->messagePayloads($rows, $actor, false),
             'changes' => $changes->count() > 120 ? [] : $this->messagePayloads($changes, $actor, false),
             'reset' => $changes->count() > 120,
-            'has_older' => $after === null && $raw->count() > 60,
-            'has_newer' => $after !== null && $raw->count() > 60,
+            'has_older' => $hasOlder,
+            'has_newer' => $hasNewer,
             'snapshot' => $snapshot->timestamp,
             'unread' => $this->customerChatUnread($actor)];
     }
@@ -341,11 +382,22 @@ class SupportInbox
 
             return;
         }
+        $this->editMessage($actor, $message->conversation_id, $messageId, $body, false);
+    }
 
-        DB::transaction(function () use ($actor, $message, $messageId, $body): void {
-            $conversation = DB::table('support_conversations')->where('id', $message->conversation_id)->lockForUpdate()->firstOrFail();
-            $row = DB::table('support_messages')->where('id', $messageId)->lockForUpdate()->firstOrFail();
-            abort_unless($row->sender_kind === 'customer' && $row->sender_id === $actor->id, 403);
+    /**
+     * Edit the sender's own text message. Customers edit their replies; Admins
+     * edit their replies and internal notes. The other side sees it as edited.
+     */
+    public function editMessage(User $actor, int $id, int $messageId, string $body, bool $admin = true): void
+    {
+        $this->authorize($actor, $id, $admin);
+        DB::transaction(function () use ($actor, $id, $messageId, $body, $admin): void {
+            $conversation = DB::table('support_conversations')->where('id', $id)->lockForUpdate()->firstOrFail();
+            $row = DB::table('support_messages')->where('conversation_id', $id)->where('id', $messageId)->lockForUpdate()->first();
+            abort_unless($row, 404);
+            abort_unless($row->sender_kind === ($admin ? 'admin' : 'customer') && $row->sender_id === $actor->id
+                && in_array($row->kind, $admin ? ['reply', 'note'] : ['reply'], true), 403);
             abort_if($row->deleted_at || blank($row->body), 409);
             if ($row->body === $body) {
                 return;

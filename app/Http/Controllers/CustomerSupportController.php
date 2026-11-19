@@ -20,11 +20,12 @@ class CustomerSupportController extends Controller
             'after' => ['nullable', 'integer', 'min:0'],
             'loaded_from' => ['nullable', 'integer', 'min:1', 'required_with:since'],
             'since' => ['nullable', 'integer', 'min:0', 'required_with:loaded_from'],
+            'until' => ['nullable', 'integer', 'min:1'],
         ]);
 
         $result = $request->boolean('badge')
             ? ['unread' => $inbox->customerChatUnread($request->user())]
-            : $inbox->customerChat($request->user(), $input['before'] ?? null, $input['after'] ?? null, $input['loaded_from'] ?? null, $input['since'] ?? null);
+            : $inbox->customerChat($request->user(), $input['before'] ?? null, $input['after'] ?? null, $input['loaded_from'] ?? null, $input['since'] ?? null, isset($input['before']) ? ($input['until'] ?? null) : null);
 
         return response()->json($result)->header('Cache-Control', 'private, no-store');
     }
@@ -80,9 +81,9 @@ class CustomerSupportController extends Controller
 
     public function show(Request $request, SupportInbox $inbox, int $conversation): JsonResponse
     {
-        $v = $request->validate(['before' => ['nullable', 'integer', 'min:1'], 'loaded_from' => ['nullable', 'integer', 'min:1']]);
+        $v = $request->validate(SupportController::pageRules());
 
-        return response()->json($inbox->detail($request->user(), $conversation, false, isset($v['before']) ? (int) $v['before'] : null, isset($v['loaded_from']) ? (int) $v['loaded_from'] : null))->header('Cache-Control', 'private, no-store');
+        return response()->json($inbox->detail($request->user(), $conversation, false, ...SupportController::pageArguments($v)))->header('Cache-Control', 'private, no-store');
     }
 
     public function send(Request $request, SupportInbox $inbox, int $conversation): JsonResponse

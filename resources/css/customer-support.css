@@ -118,3 +118,30 @@
 .cs-composer-action .cs-delete-confirm:hover{background:#ff929f29}
 .cs-composer-action .cs-delete-confirm svg{width:11px;height:11px}
 .cs-composer-error{border-radius:9px;margin-bottom:6px}
+/* Spinner, history paging, reply jumps and jump-to-latest (2026-11-19) */
+.customer-support-chat .spin{animation:cs-spin .85s linear infinite;transform-origin:center}
+@keyframes cs-spin{to{transform:rotate(360deg)}}
+.customer-support-thread-wrap{position:relative;flex:1;min-height:0;display:flex;flex-direction:column}
+.customer-support-thread{min-height:100%;display:flex;flex-direction:column}
+.customer-support-thread>.customer-support-loading,.customer-support-thread>.customer-support-welcome{flex:1}
+.cs-history-loading{align-self:center;display:inline-flex;align-items:center;gap:8px;margin:10px auto 4px;padding:6px 13px;border-radius:20px;font-size:10px;color:var(--primary);background:linear-gradient(90deg,#b8a8ff12,#b8a8ff26,#b8a8ff12);background-size:200% 100%;animation:cs-shimmer 1.4s linear infinite;box-shadow:0 2px 10px #0004}
+.cs-typing{display:inline-flex;gap:3px}
+.cs-typing i{width:5px;height:5px;border-radius:50%;background:currentColor;animation:cs-dot 1s ease-in-out infinite}
+.cs-typing i:nth-child(2){animation-delay:.15s}.cs-typing i:nth-child(3){animation-delay:.3s}
+@keyframes cs-dot{0%,80%,100%{opacity:.3;transform:translateY(0)}40%{opacity:1;transform:translateY(-3px)}}
+@keyframes cs-shimmer{to{background-position:-200% 0}}
+.cs-history-start{display:flex;justify-content:center;margin:12px 0 4px}
+.cs-history-start span{font-size:9px;color:var(--text-muted);padding:3px 10px;border-radius:12px;background:#ffffff08}
+.customer-support-bubble .cs-quote{display:block;width:100%;margin:0 0 7px;padding:5px 7px;border:0;border-left:2px solid var(--primary);background:#0002;border-radius:4px;font-size:10px;color:inherit;text-align:start;cursor:pointer;transition:background .15s}
+.customer-support-bubble .cs-quote span{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere;white-space:pre-wrap}
+.customer-support-bubble .cs-quote:hover,.customer-support-bubble .cs-quote:focus-visible{background:#0004}
+.customer-support-bubble .cs-quote:disabled{cursor:default;opacity:.7}
+.customer-support-message.is-highlighted .customer-support-bubble{animation:cs-highlight 1.8s ease-out}
+@keyframes cs-highlight{0%,30%{box-shadow:0 0 0 2px var(--primary),0 0 18px #b8a8ff66}100%{box-shadow:0 0 0 0 transparent}}
+.customer-support-message time .cs-edited{font-style:italic}
+.cs-jump-bottom{position:absolute;right:14px;bottom:12px;z-index:2;display:grid;place-items:center;width:34px;height:34px;padding:0;border:0;border-radius:50%;color:var(--text);background:var(--surface-elevated);box-shadow:0 6px 18px #0008,inset 0 1px 0 #ffffff12;cursor:pointer;animation:cs-jump-in .18s ease-out}
+.cs-jump-bottom:hover,.cs-jump-bottom:focus-visible{color:var(--primary)}
+.cs-jump-bottom svg{width:16px;height:16px}
+.cs-jump-count{position:absolute;top:-5px;right:-4px;min-width:17px;height:17px;padding:0 4px;border-radius:9px;background:var(--primary);color:var(--text-inverse);font-size:9px;font-weight:700;line-height:17px;text-align:center}
+@keyframes cs-jump-in{from{opacity:0;transform:translateY(6px) scale(.9)}}
+@media (prefers-reduced-motion:reduce){.customer-support-chat .spin,.cs-history-loading,.cs-typing i,.customer-support-message.is-highlighted .customer-support-bubble,.cs-jump-bottom{animation-duration:2.5s}.cs-jump-bottom{animation:none}}

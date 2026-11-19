@@ -38,6 +38,7 @@ Route::prefix('admin')->name('admin.')->group(function (): void {
             Route::post('/', [SupportController::class, 'store'])->middleware('throttle:30,1')->name('store');
             Route::get('/{conversation}', [SupportController::class, 'show'])->whereNumber('conversation')->name('show');
             Route::post('/{conversation}/messages', [SupportController::class, 'send'])->whereNumber('conversation')->middleware('throttle:30,1')->name('send');
+            Route::patch('/{conversation}/messages/{message}', [SupportController::class, 'editMessage'])->whereNumber('conversation')->whereNumber('message')->middleware('throttle:30,1')->name('messages.update');
             Route::delete('/{conversation}/messages/{message}', [SupportController::class, 'destroyMessage'])->whereNumber('conversation')->whereNumber('message')->middleware('throttle:30,1')->name('messages.destroy');
             Route::patch('/{conversation}', [SupportController::class, 'update'])->whereNumber('conversation')->middleware('throttle:60,1')->name('update');
             Route::post('/{conversation}/read', [SupportController::class, 'read'])->whereNumber('conversation')->middleware('throttle:120,1')->name('read');
