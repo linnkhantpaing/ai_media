@@ -102,7 +102,7 @@ class OperationsTelemetry
 
             return $this->save($task, [
                 'status' => $project->import_cancel_requested ? 'stopping' : ($task->status === 'running' ? 'running' : 'queued'),
-                'stage' => $project->import_stage ?: 'queued', 'error_code' => $project->error_code,
+                'stage' => $project->import_stage ?: 'queued', 'progress' => min(99, (int) $project->source_progress), 'error_code' => $project->error_code,
                 ...($historical ? ['history_available' => false] : []),
             ]);
         }
@@ -110,7 +110,7 @@ class OperationsTelemetry
             $this->finishSource($project, 'import', 'completed', null);
             $task = $this->sourceTask($project, 'validation', $historical);
 
-            return $this->save($task, ['status' => $task->status === 'running' ? 'running' : 'queued', 'stage' => 'validate', ...($historical ? ['history_available' => false] : [])]);
+            return $this->save($task, ['status' => $task->status === 'running' ? 'running' : 'queued', 'stage' => 'validate', 'progress' => min(99, (int) $project->source_progress), ...($historical ? ['history_available' => false] : [])]);
         }
         if (in_array($project->status, ['import_failed', 'import_cancelled'], true)) {
             if ($historical && ! MediaTask::where('media_project_id', $project->id)->where('type', 'import')->exists()) {

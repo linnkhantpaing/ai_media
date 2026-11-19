@@ -12,6 +12,7 @@ use App\Jobs\InspectMediaProject;
 use App\Jobs\ProcessMediaRun;
 use App\Models\MediaProject;
 use App\Models\MediaRun;
+use App\Services\Media\MediaNarrationFit;
 use App\Services\Media\MediaRunActions;
 use App\Services\Media\MediaRuntime;
 use App\Services\Media\MediaStorage;
@@ -22,6 +23,7 @@ use App\Services\Media\StorageSettings;
 use App\Services\Media\YouTubeImports;
 use App\Services\UsageLedger;
 use App\Support\MediaSettings;
+use App\Support\StudioTesting;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -189,11 +191,13 @@ class MediaProjectController extends Controller
             $changes = ['title' => $data['title']];
             if (isset($data['settings'])) {
                 $settings = MediaSettings::normalize($data['settings']);
-                if (($locked->lines ?? []) !== [] && $settings['source_lang'] !== $locked->settings['source_lang']) {
+                if (($locked->lines ?? []) !== [] && array_intersect_key($settings, array_flip(['workflow', 'source_lang', 'narration_lang', 'subtitle_lang', 'target_seconds', 'narration_style', 'story_order', 'spoilers', 'custom_style', 'character_focus', 'instructions'])) != array_intersect_key(MediaSettings::normalize($locked->settings), array_flip(['workflow', 'source_lang', 'narration_lang', 'subtitle_lang', 'target_seconds', 'narration_style', 'story_order', 'spoilers', 'custom_style', 'character_focus', 'instructions']))) {
                     if (! ($data['confirm_reanalysis'] ?? false)) {
                         $this->error('confirm_reanalysis', 409);
                     }
                     $changes['lines'] = [];
+                    $changes['status'] = 'ready';
+                    $changes['active_run_id'] = null;
                 }
                 $changes['settings'] = $settings;
             }
@@ -298,6 +302,7 @@ class MediaProjectController extends Controller
             if ($run->status !== 'awaiting_review') {
                 $this->error('project_busy', 409);
             }
+            app(MediaNarrationFit::class)->requireReady($project);
             $run->forceFill(['provider_revision_id' => app(ProviderSettings::class)->snapshot(), 'phase' => 'generate', 'status' => 'queued', 'settings' => $project->settings, 'stage' => 'rendering', 'progress' => 0, 'lines' => $project->lines, 'error_code' => null])->save();
             app(UsageLedger::class)->reserve($run);
             $project->forceFill(['status' => 'queued', 'error_code' => null])->save();
@@ -361,6 +366,7 @@ class MediaProjectController extends Controller
             'video' => $project->output_path,
             'audio' => $project->audio_path,
             'subtitles' => $project->subtitle_path,
+            'styledSubtitles' => ($project->metadata['output']['styled'] ?? false) ? preg_replace('/\.srt$/', '.ass', (string) $project->subtitle_path) : null,
             default => null,
         };
         abort_unless($path, 404);
@@ -369,8 +375,8 @@ class MediaProjectController extends Controller
         } catch (MediaFailure) {
             abort(404);
         }
-        if ($kind === 'subtitles' || $request->boolean('download')) {
-            return response()->download($file, (Str::slug($project->title) ?: 'ai-media-recap').($kind === 'subtitles' ? '.srt' : ($kind === 'audio' ? '.'.pathinfo($path, PATHINFO_EXTENSION) : '.mp4')));
+        if (in_array($kind, ['subtitles', 'styledSubtitles'], true) || $request->boolean('download')) {
+            return response()->download($file, (Str::slug($project->title) ?: 'ai-media-recap').($kind === 'styledSubtitles' ? '.ass' : ($kind === 'subtitles' ? '.srt' : ($kind === 'audio' ? '.'.pathinfo($path, PATHINFO_EXTENSION) : '.mp4'))));
         }
 
         return response()->file($file, ['Content-Type' => $kind === 'poster' ? 'image/jpeg' : ($kind === 'source' ? $project->source_mime : ($kind === 'audio' ? (str_ends_with($path, '.mp3') ? 'audio/mpeg' : 'audio/wav') : 'video/mp4'))]);
@@ -403,11 +409,19 @@ class MediaProjectController extends Controller
 
     private function common(): array
     {
+        $assignment = request()->user()?->currentPackageAssignment;
+        $definition = StudioTesting::enabled() ? [] : ($assignment?->effectiveSnapshot()['definition'] ?? []);
+        $limits = app(StorageSettings::class)->limits();
+
         return [
+            'testingMode' => StudioTesting::enabled(),
+            'features' => $definition['features'] ?? null,
+            'studioDefaults' => MediaSettings::defaults((int) request()->user()->id),
+            'dictionaryUrl' => route('media.dictionary.save', absolute: false),
             'runtime' => $this->runtime->capabilities(),
             'presetsUrl' => route('media.presets', absolute: false),
             'storage' => ['disk' => app(StorageSettings::class)->connection()['disk'], 'ready' => app(MediaStorage::class)->ready(), 'used' => app(MediaStorage::class)->reservedBytes(), 'limit' => app(StorageSettings::class)->policy()['budget']],
-            'limits' => ['bytes' => app(StorageSettings::class)->limits()['max_bytes'], 'duration' => app(StorageSettings::class)->limits()['max_duration'], 'chunkBytes' => config('media.chunk_bytes')],
+            'limits' => ['bytes' => min($limits['max_bytes'], $definition['max_upload_bytes'] ?? $limits['max_bytes']), 'duration' => min($limits['max_duration'], $definition['max_video_seconds'] ?? $limits['max_duration']), 'chunkBytes' => config('media.chunk_bytes')],
             'initializeUrl' => route('media.initialize', absolute: false),
             'youtubeImportUrl' => route('media.youtube', absolute: false),
             'resumeUrlTemplate' => route('media.status', ['mediaProject' => 'PROJECT_ID'], absolute: false),
@@ -424,19 +438,21 @@ class MediaProjectController extends Controller
             'allowance' => app(UsageLedger::class)->quote($project),
             'id' => $project->id, 'title' => $project->title, 'filename' => $project->source_name,
             'bytes' => $project->expected_bytes, 'uploadedBytes' => $this->uploads->offset($project),
-            'status' => $project->status, 'errorCode' => $project->error_code,
+            'status' => $project->status, 'errorCode' => $project->error_code, 'sourceProgress' => $project->source_progress,
             'metadata' => $project->metadata, 'settings' => MediaSettings::normalize($project->settings),
+            'scriptRevision' => hash('sha256', json_encode($project->lines ?? [])),
+            'narrationFitReady' => $project->lines && $project->previews()->where('kind', 'fit')->where('status', 'completed')->where('result->ready', true)->where('result->signature', MediaNarrationFit::signature($project, $project->lines, $project->settings))->exists(),
             'lines' => $project->lines ?? [], 'updatedAt' => $project->updated_at->toIso8601String(),
             'storageDisk' => $project->storage_disk, 'fingerprint' => $project->fingerprint,
             'sourceType' => $project->source_type, 'sourceUrl' => $project->source_url,
             'import' => $project->source_type === 'youtube' ? ['stage' => $project->import_stage, 'downloadedBytes' => $project->imported_bytes, 'cancelRequested' => $project->import_cancel_requested] : null,
             'hasOutput' => (bool) $project->output_path, 'hasAudio' => (bool) $project->audio_path, 'previewBusy' => $preview && in_array($preview->status, ['queued', 'running'], true), 'latestPreview' => $preview ? app(MediaToolsController::class)->data($preview) : null, 'hasSubtitles' => (bool) $project->subtitle_path,
-            'run' => $run ? ['id' => $run->id, 'status' => $run->status, 'phase' => $run->phase, 'stage' => $run->stage, 'progress' => $run->progress, 'stages' => $run->stages ?? [], 'errorCode' => $run->error_code, 'cancelRequested' => $run->cancel_requested] : null,
+            'run' => $run ? ['id' => $run->id, 'status' => $run->status, 'phase' => $run->phase, 'stage' => $run->stage, 'progress' => $run->progress, 'stageProgress' => $run->artifacts['stage_progress'] ?? 0, 'stages' => $run->stages ?? [], 'errorCode' => $run->error_code, 'cancelRequested' => $run->cancel_requested] : null,
             'links' => [
                 'status' => $link('status'), 'upload' => $link('upload'), 'complete' => $link('complete'),
                 'update' => $link('update'), 'destroy' => $link('destroy'),
                 'uploadPage' => $link('upload.page'), 'setup' => $link('setup'), 'analysis' => $link('analysis'),
-                'start' => $link('start'), 'generate' => $link('generate'), 'script' => $link('script'),
+                'start' => $link('start'), 'generate' => $link('generate'), 'scenes' => $link('scenes'), 'styledSubtitles' => $link('file', ['kind' => 'styledSubtitles']), 'script' => $link('script'),
                 'importRetry' => $link('import.retry'), 'importCancel' => $link('import.cancel'),
                 'retry' => $link('retry'), 'cancel' => $link('cancel'), 'reopen' => $link('reopen'),
                 'source' => $link('file', ['kind' => 'source']), 'poster' => $link('file', ['kind' => 'poster']),

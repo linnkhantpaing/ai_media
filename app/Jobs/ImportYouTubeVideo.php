@@ -71,9 +71,12 @@ class ImportYouTubeVideo implements ShouldBeUnique, ShouldQueue
                 MediaProject::whereKey($project->id)->where('title', 'YouTube video')->update(['title' => Str::limit(trim($info['title']), 250, '') ?: 'YouTube video']);
             }
             $this->stage('downloading');
-            $download = $downloader->download($project->source_url, $directory, function (int $bytes): void {
-                MediaProject::whereKey($this->projectId)->where('status', 'importing')->where('import_cancel_requested', false)->update(['imported_bytes' => max(0, $bytes)]);
-            }, $cancelled);
+            $download = $downloader->download($project->source_url, $directory, function (int $bytes, int $percent = 0): void {
+                MediaProject::whereKey($this->projectId)->where('status', 'importing')->where('import_cancel_requested', false)->update(['imported_bytes' => max(0, $bytes), 'source_progress' => 5 + (int) floor(min(100, max(0, $percent)) * 0.7)]);
+                if ($current = MediaProject::find($this->projectId)) {
+                    app(OperationsTelemetry::class)->syncSource($current);
+                }
+            }, $cancelled, $info['parts'] ?? 1);
             $this->stage('preparing');
             $probe = $runtime->probe($download);
             $video = collect($probe['streams'] ?? [])->firstWhere('codec_type', 'video');
@@ -86,7 +89,9 @@ class ImportYouTubeVideo implements ShouldBeUnique, ShouldQueue
             $arguments = ['-nostdin', '-v', 'error', '-y', '-protocol_whitelist', 'file,pipe', '-i', $download, '-map', '0:v:0', '-map', '0:a:0'];
             array_push($arguments, ...($copy ? ['-c', 'copy'] : ['-c:v', 'libx264', '-preset', 'veryfast', '-crf', '21', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-threads', '2']));
             array_push($arguments, '-movflags', '+faststart', '-map_metadata', '-1', $temporary);
-            $runtime->execute('ffmpeg', $arguments, timeout: 600, cancelled: $cancelled);
+            $runtime->execute('ffmpeg', $arguments, timeout: 600, cancelled: $cancelled, progress: function (int $percent): void {
+                MediaProject::whereKey($this->projectId)->where('status', 'importing')->where('import_cancel_requested', false)->update(['source_progress' => 75 + (int) floor($percent * 0.15)]);
+            }, duration: (float) $info['duration']);
             clearstatcache(true, $temporary);
             $size = filesize($temporary);
             if (! $size || $size > app(StorageSettings::class)->limits()['max_bytes']) {
@@ -106,7 +111,7 @@ class ImportYouTubeVideo implements ShouldBeUnique, ShouldQueue
                     $current->forceFill([
                         'source_name' => Str::limit($filename, 240, '').'.mp4', 'source_mime' => 'video/mp4',
                         'expected_bytes' => $size, 'uploaded_bytes' => $size, 'status' => 'validating',
-                        'import_stage' => 'validating', 'imported_bytes' => max($size, $current->imported_bytes), 'error_code' => null,
+                        'import_stage' => 'validating', 'source_progress' => 90, 'imported_bytes' => max($size, $current->imported_bytes), 'error_code' => null,
                     ])->save();
                 });
             });
@@ -136,7 +141,7 @@ class ImportYouTubeVideo implements ShouldBeUnique, ShouldQueue
         if ($this->cancelled()) {
             throw new MediaFailure('cancelled');
         }
-        MediaProject::whereKey($this->projectId)->where('status', 'importing')->where('import_cancel_requested', false)->update(['import_stage' => $stage]);
+        MediaProject::whereKey($this->projectId)->where('status', 'importing')->where('import_cancel_requested', false)->update(['import_stage' => $stage, 'source_progress' => ['checking' => 1, 'downloading' => 5, 'preparing' => 75][$stage] ?? 0]);
         if ($project = MediaProject::find($this->projectId)) {
             app(OperationsTelemetry::class)->syncSource($project);
         }

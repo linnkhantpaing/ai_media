@@ -5,6 +5,7 @@ namespace App\Services\Media;
 use App\Exceptions\MediaFailure;
 use App\Models\MediaProject;
 use App\Services\UsageLedger;
+use App\Support\StudioTesting;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -49,7 +50,7 @@ class MediaStorage
             $source = $relative === $project->source_path;
             if ($source) {
                 $assignment = $project->user->currentPackageAssignment;
-                $limit = $assignment?->effectiveSnapshot()['definition']['max_upload_bytes'] ?? null;
+                $limit = StudioTesting::enabled() ? null : ($assignment?->effectiveSnapshot()['definition']['max_upload_bytes'] ?? null);
                 if ($limit !== null && $bytes > $limit) {
                     throw new MediaFailure('too_large');
                 }
@@ -147,13 +148,11 @@ class MediaStorage
         try {
             if ($project->storage_disk !== 'local') {
                 $disk = app(StorageSettings::class)->filesystem($project->storage_profile_id, $project->storage_disk);
-                $disk->deleteDirectory('media/'.$project->id);
-                if ($disk->directoryExists('media/'.$project->id)) {
+                if (! $disk->deleteDirectory('media/'.$project->id) || $disk->directoryExists('media/'.$project->id)) {
                     throw new MediaFailure('storage_unavailable', true);
                 }
             }
-            Storage::disk('local')->deleteDirectory('media/'.$project->id);
-            if (Storage::disk('local')->directoryExists('media/'.$project->id)) {
+            if (! Storage::disk('local')->deleteDirectory('media/'.$project->id) || Storage::disk('local')->directoryExists('media/'.$project->id)) {
                 throw new MediaFailure('storage_unavailable', true);
             }
             app(UsageLedger::class)->discardStorage($project);

@@ -9,6 +9,8 @@ import {PlatformNotice,PlatformSupport} from '@/components/platform-notice';
 import { BrandLogo } from '@/components/brand-logo';
 import { StudioIcon } from '@/components/studio-icon';
 import { StudioBreadcrumb } from '@/components/studio-breadcrumb';
+import {CustomerQueue} from '@/components/customer-queue';
+import {CustomerSupport} from '@/components/customer-support';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { navigation, isWorkflow, isLibrary, workflow } from '@/lib/navigation';
 import { useTranslations } from '@/lib/i18n';
@@ -98,6 +100,7 @@ export default function AppLayout({ children, frame, breadcrumbLabel, area = 'us
     const { t } = useTranslations();
     const { t: adminText } = useAdminTranslations();
     const adminArea = area === 'admin';
+    useEffect(()=>{if(adminArea)return;const previous=document.body.getAttribute('data-fixed-theme');document.body.setAttribute('data-fixed-theme','dark');return()=>{if(previous===null)document.body.removeAttribute('data-fixed-theme');else document.body.setAttribute('data-fixed-theme',previous);};},[adminArea]);
     const sidebarStorage = adminArea ? 'ai-media.admin-sidebar' : 'ai-media.sidebar';
     const [collapsed, setCollapsed] = useState(() => {
         try { return localStorage.getItem(sidebarStorage) === 'collapsed'; } catch { return false; }
@@ -170,7 +173,7 @@ export default function AppLayout({ children, frame, breadcrumbLabel, area = 'us
                 <button type="button" className="icon-button studio-mobile-menu" aria-label={t('openNavigation')} aria-haspopup="dialog" aria-expanded={drawer} onClick={toggleNavigation}><StudioIcon name="menu" /></button>
                 <button type="button" className="studio-search-trigger" aria-label={t('searchPages')} aria-haspopup="dialog" onClick={() => setSearch(true)}><StudioIcon name="search" /><span>{t('searchPages')}</span><kbd>Ctrl K</kbd></button>
                 <div className="studio-header-controls">
-                    <LocaleSwitcher /><ThemeToggle compact />
+                    <LocaleSwitcher iconOnly={!adminArea}/>{adminArea?<ThemeToggle compact/>:<div className="user-header-communications"><CustomerQueue/><CustomerSupport/></div>}
                     {adminArea ? <AdminNotificationBell/> : <details className="studio-header-menu notifications-menu">
                         <summary className="icon-button" aria-label={t('notifications')} title={t('notifications')}><StudioIcon name="bell" /></summary>
                         <div className="studio-popover notifications-popover"><p className="popover-heading">{t('notifications')}</p><div className="notification-empty"><StudioIcon name="bell" /><strong>{t('noNotifications')}</strong><p>{t('notificationsDetail')}</p></div></div>

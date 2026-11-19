@@ -7,7 +7,9 @@ use App\Jobs\ProcessMediaRun;
 use App\Models\MediaProject;
 use App\Models\MediaRun;
 use App\Models\User;
+use App\Services\Media\StorageSettings;
 use App\Support\MediaSettings;
+use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
@@ -149,7 +151,7 @@ class MediaUploadTest extends TestCase
 
     public function test_history_is_owner_scoped_and_completed_deletion_requires_confirmation(): void
     {
-        $mine = $this->owned(['status' => 'completed', 'lines' => [['text' => 'saved']]]);
+        $mine = $this->owned(['status' => 'completed', 'lines' => [['index' => 0, 'start' => 0, 'end' => 1, 'text' => 'saved']]]);
         MediaProject::factory()->create(['status' => 'completed']);
         $this->get('/projects?status=completed')->assertInertia(fn (Assert $page) => $page
             ->component('projects/index')->has('projects.data', 1)->where('projects.data.0.id', $mine->id));
@@ -169,6 +171,46 @@ class MediaUploadTest extends TestCase
             ->assertJsonPath('project.lines.0.text', 'Saved');
         Queue::assertNotPushed(ProcessMediaRun::class);
         $this->assertDatabaseCount('media_runs', 1);
+    }
+
+    public function test_confirmed_delete_removes_all_local_and_r2_artifacts_only_for_the_owned_project(): void
+    {
+        Storage::fake('r2');
+        $owner = auth()->user();
+        $mine = $this->owned(['status' => 'completed', 'storage_disk' => 'r2', 'storage_profile_id' => null, 'lines' => [['text' => 'Saved script']]]);
+        $other = MediaProject::factory()->create(['storage_disk' => 'r2', 'storage_profile_id' => null]);
+        $files = ['source.mp4', 'runs/finished/recap.mp4', 'runs/finished/recap.srt', 'runs/preview/preview.mp4', 'voices/cached.wav', 'background/instrumental.wav', 'unregistered-cache/thumbnail.jpg'];
+        foreach ($files as $file) {
+            foreach (['local', 'r2'] as $disk) {
+                Storage::disk($disk)->put('media/'.$mine->id.'/'.$file, 'owned fixture');
+                Storage::disk($disk)->put('media/'.$other->id.'/'.$file, 'other customer fixture');
+            }
+        }
+        $this->actingAs(User::factory()->create())->deleteJson('/media/projects/'.$mine->id, ['confirm' => true])->assertNotFound();
+        Storage::disk('r2')->assertExists('media/'.$mine->id.'/source.mp4');
+        $this->actingAs($owner)->deleteJson('/media/projects/'.$mine->id, ['confirm' => true])->assertOk()->assertJsonPath('removed', true);
+        foreach ($files as $file) {
+            foreach (['local', 'r2'] as $disk) {
+                Storage::disk($disk)->assertMissing('media/'.$mine->id.'/'.$file);
+                Storage::disk($disk)->assertExists('media/'.$other->id.'/'.$file);
+            }
+        }
+        $this->assertDatabaseMissing('media_projects', ['id' => $mine->id]);
+        $this->assertDatabaseHas('media_projects', ['id' => $other->id]);
+    }
+
+    public function test_failed_r2_deletion_never_reports_success_or_deletes_the_project_record(): void
+    {
+        $mine = $this->owned(['status' => 'completed', 'storage_disk' => 'r2', 'storage_profile_id' => null, 'lines' => [['text' => 'Saved script']]]);
+        Storage::disk('local')->put($mine->source_path, 'retained local source');
+        $remote = \Mockery::mock(Filesystem::class);
+        $remote->shouldReceive('deleteDirectory')->once()->with('media/'.$mine->id)->andReturn(false);
+        $this->partialMock(StorageSettings::class, function ($mock) use ($remote): void {
+            $mock->shouldReceive('filesystem')->with(null, 'r2')->andReturn($remote);
+        });
+        $this->deleteJson('/media/projects/'.$mine->id, ['confirm' => true])->assertStatus(503);
+        $this->assertDatabaseHas('media_projects', ['id' => $mine->id]);
+        Storage::disk('local')->assertExists($mine->source_path);
     }
 
     private function owned(array $attributes = []): MediaProject

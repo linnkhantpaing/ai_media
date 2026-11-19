@@ -120,7 +120,9 @@ class MediaProcessingTest extends TestCase
         $this->assertSame(240, $project->metadata['output']['width']);
         $this->assertSame(426, $project->metadata['output']['height']);
         Http::assertSentCount(4);
-        $this->assertStringContainsString('00:00:02,600', Storage::disk('local')->get($project->subtitle_path));
+        $srt = Storage::disk('local')->get($project->subtitle_path);
+        $this->assertSame(1, preg_match('/00:00:00,200 --> 00:00:02,(\d{3})/', $srt, $end));
+        $this->assertEqualsWithDelta(600, (int) $end[1], 30, 'Captions must cover the complete voice after sub-frame edge-silence trimming.');
     }
 
     public function test_crop_pad_and_manual_cover_render_real_readable_files(): void

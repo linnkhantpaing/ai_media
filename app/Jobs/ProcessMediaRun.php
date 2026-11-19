@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Exceptions\MediaAnalysisDeferred;
 use App\Exceptions\MediaFailure;
 use App\Models\MediaProject;
 use App\Models\MediaRun;
@@ -76,8 +77,31 @@ class ProcessMediaRun implements ShouldBeUnique, ShouldQueue
                 if ($run->phase === 'generate') {
                     $pipeline->generate($run);
                 }
+            } catch (MediaAnalysisDeferred) {
+                $run->refresh();
+                if ($run->cancel_requested) {
+                    $this->finish($run, 'cancelled', null);
+
+                    return;
+                }
+                $artifacts = $run->artifacts ?? [];
+                $artifacts['processing_attempts_'.$run->phase] = max(0, $attempt - 1);
+                $artifacts['analysis_continuations'] = (int) ($artifacts['analysis_continuations'] ?? 0) + 1;
+                $run->forceFill(['status' => 'queued', 'artifacts' => $artifacts, 'error_code' => null])->save();
+                MediaProject::whereKey($run->media_project_id)->where('active_run_id', $run->id)
+                    ->where('status', '!=', 'cancel_requested')->update(['status' => 'queued', 'error_code' => null]);
+                $this->release(1);
             } catch (MediaFailure $failure) {
                 $run->refresh();
+                if ($run->phase === 'analysis' && $failure->retryable) {
+                    $artifacts = $run->artifacts ?? [];
+                    $checkpoint = count($artifacts['catalog'] ?? []).':'.count(array_filter($run->lines ?? [], fn (array $line): bool => isset($line['subtitle_text'])));
+                    $attempt = ($artifacts['analysis_failure_checkpoint'] ?? null) === $checkpoint
+                        ? (int) ($artifacts['analysis_failures_without_progress'] ?? 0) + 1 : 1;
+                    $artifacts['analysis_failure_checkpoint'] = $checkpoint;
+                    $artifacts['analysis_failures_without_progress'] = $attempt;
+                    $run->forceFill(['artifacts' => $artifacts])->save();
+                }
                 if ($failure->reason === 'cancelled' || $run->cancel_requested) {
                     $this->finish($run, 'cancelled', null);
                 } elseif ($failure->retryable && $attempt < $this->tries) {

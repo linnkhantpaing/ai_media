@@ -4,13 +4,14 @@ namespace App\Services\Media;
 
 use App\Exceptions\MediaFailure;
 use App\Models\MediaProject;
+use App\Support\StudioTesting;
 use Illuminate\Support\Facades\Storage;
 
 class MediaInspector
 {
     public function __construct(private MediaRuntime $runtime) {}
 
-    public function inspect(MediaProject $project): array
+    public function inspect(MediaProject $project, ?callable $progress = null): array
     {
         $file = Storage::disk('local')->path($project->source_path);
         if (! is_file($file) || filesize($file) !== $project->expected_bytes) {
@@ -20,7 +21,13 @@ class MediaInspector
         if (! in_array($mime, ['video/mp4', 'video/quicktime', 'video/x-matroska', 'video/webm', 'video/x-m4v', 'application/octet-stream'], true)) {
             throw new MediaFailure('unsupported_file');
         }
+        if ($progress) {
+            $progress(10);
+        }
         $probe = $this->runtime->probe($file);
+        if ($progress) {
+            $progress(35);
+        }
         $streams = collect($probe['streams'] ?? []);
         $video = $streams->firstWhere('codec_type', 'video');
         $audio = $streams->firstWhere('codec_type', 'audio');
@@ -32,7 +39,7 @@ class MediaInspector
         if (! is_finite($duration) || $duration <= 0) {
             throw new MediaFailure('unreadable_duration');
         }
-        if ($duration > ($project->storage_policy ?? app(StorageSettings::class)->policy())['max_duration']) {
+        if ($duration > StudioTesting::policy($project->storage_policy ?? app(StorageSettings::class)->policy())['max_duration']) {
             throw new MediaFailure('duration_exceeded');
         }
         if (! $audio || ! ($audio['sample_rate'] ?? 0)) {
@@ -50,11 +57,17 @@ class MediaInspector
         $this->runtime->execute('ffmpeg', [
             '-nostdin', '-v', 'error', '-protocol_whitelist', 'file,pipe', '-i', $file, '-t', '2', '-f', 'null', '-',
         ], timeout: 45);
+        if ($progress) {
+            $progress(75);
+        }
         $poster = Storage::disk('local')->path('media/'.$project->id.'/poster.jpg');
         $this->runtime->execute('ffmpeg', [
             '-nostdin', '-v', 'error', '-y', '-ss', (string) min(1, $duration / 3), '-i', $file,
             '-frames:v', '1', '-vf', 'scale=640:-2', '-q:v', '3', $poster,
         ], timeout: 45);
+        if ($progress) {
+            $progress(100);
+        }
         $a = $width;
         $b = $height;
         while ($b !== 0) {

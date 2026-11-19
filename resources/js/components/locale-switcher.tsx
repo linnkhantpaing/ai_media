@@ -10,7 +10,7 @@ const languages: { value: Locale; label: string; flag: string }[] = [
     { value: 'th', label: 'ไทย', flag: '/images/flags/th.svg' },
 ];
 
-export function LocaleSwitcher() {
+export function LocaleSwitcher({iconOnly=false}:{iconOnly?:boolean}) {
     const { locale, links } = usePage<SharedData>().props;
     const { t } = useTranslations();
     const [busy, setBusy] = useState(false);
@@ -90,7 +90,7 @@ export function LocaleSwitcher() {
         }
     }
 
-    return <div ref={root} className="locale-switcher" data-open={open} aria-busy={busy} onBlur={(event) => {
+    return <div ref={root} className={'locale-switcher'+(iconOnly?' locale-icon-only':'')} data-open={open} aria-busy={busy} onBlur={(event) => {
         if (!event.currentTarget.contains(event.relatedTarget as Node | null)) close();
     }}>
         <button ref={trigger} id={id + '-trigger'} type="button" className="locale-trigger" aria-haspopup="listbox" aria-expanded={open} aria-controls={id + '-options'} aria-label={t('language') + ': ' + current.label} disabled={busy} onClick={() => open ? close() : show()} onKeyDown={(event) => {

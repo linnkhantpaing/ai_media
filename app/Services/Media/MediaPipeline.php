@@ -30,14 +30,20 @@ class MediaPipeline
         return Storage::disk('local')->path($relative);
     }
 
-    public function stage(MediaRun $run, string $key, bool $complete = false): void
+    public function stage(MediaRun $run, string $key, bool $complete = false, int $stageProgress = 0): void
     {
         $this->check($run);
         $stages = $run->stages ?? [];
         $stages[$key] = $complete ? 'completed' : 'active';
-        $progress = (int) floor(count(array_filter($stages, fn (string $state) => $state === 'completed')) / max(1, count($stages)) * 100);
+        $stageProgress = $complete ? 100 : min(99, max(0, $stageProgress));
+        if (! $complete && $run->stage === $key) {
+            $stageProgress = min(99, max($stageProgress, (int) ($run->artifacts['stage_progress'] ?? 0)));
+        }
+        $finished = count(array_filter($stages, fn (string $state) => $state === 'completed'));
+        $progress = min(99, (int) floor(($finished + ($complete ? 0 : $stageProgress / 100)) / max(1, count($stages)) * 100));
+        $progress = min(99, max((int) $run->progress, $progress));
         $status = $run->phase === 'analysis' ? ($key === 'translate' ? 'translating' : 'analyzing') : 'rendering';
-        $run->forceFill(['stage' => $key, 'stages' => $stages, 'progress' => $progress, 'status' => $status, 'error_code' => null])->save();
+        $run->forceFill(['stage' => $key, 'stages' => $stages, 'progress' => $progress, 'artifacts' => [...($run->artifacts ?? []), 'stage_progress' => $stageProgress], 'status' => $status, 'error_code' => null])->save();
         MediaProject::whereKey($run->media_project_id)->where('active_run_id', $run->id)
             ->where('status', '!=', 'cancel_requested')->update(['status' => $status, 'error_code' => null]);
     }
@@ -50,53 +56,62 @@ class MediaPipeline
         if (($run->stages ?? []) === []) {
             $run->forceFill(['stages' => array_fill_keys(['prepare', 'transcribe', 'context', 'translate'], 'waiting'), 'started_at' => now()])->save();
         }
-        $this->stage($run, 'prepare');
-        $audio = $directory.'/source.mp3';
-        if (! is_file($audio) || filesize($audio) === 0) {
-            $this->runtime->execute('ffmpeg', [
-                '-nostdin', '-v', 'error', '-y', '-i', app(MediaStorage::class)->materialize($project, $project->source_path),
-                '-vn', '-ac', '1', '-ar', '16000', '-b:a', '48k', '-f', 'mp3', $audio,
-            ], timeout: 180, cancelled: fn () => $this->cancelled($run));
-        }
-        $this->stage($run, 'prepare', true);
-        $this->stage($run, 'transcribe');
-        $lines = $run->lines ?? [];
-        if ($lines === []) {
-            $result = $this->gemini->transcribe($audio, $run->settings['source_lang']);
-            $this->check($run);
-            $lines = $this->validateTranscript($result['segments'] ?? null, (float) $project->metadata['duration']);
-            $artifacts = $run->artifacts ?? [];
-            $artifacts['context'] = mb_substr((string) ($result['summary'] ?? ''), 0, 8000);
-            $run->forceFill(['lines' => $lines, 'artifacts' => $artifacts])->save();
-        }
-        $this->stage($run, 'transcribe', true);
-        $this->stage($run, 'context');
-        $this->stage($run, 'context', true);
-        $this->stage($run, 'translate');
-        foreach (array_chunk($lines, 30, true) as $chunk) {
-            $pending = array_filter($chunk, fn (array $line) => trim((string) ($line['text'] ?? '')) === '');
-            if ($pending === []) {
-                continue;
+        if (isset($run->settings['workflow'])) {
+            $this->stage($run, 'transcribe');
+            $lines = app(RecapPlanner::class)->analyze($run, $directory, fn () => $this->check($run), fn (string $key, bool $done = false, int $percent = 0) => $this->stage($run, $key, $done, $percent));
+            foreach (['prepare', 'transcribe', 'context', 'translate'] as $key) {
+                $this->stage($run, $key, true);
             }
-            $response = $this->gemini->translate(array_values($pending), (string) ($run->artifacts['context'] ?? ''));
-            $this->check($run);
-            $translations = $response['translations'] ?? null;
-            if (! is_array($translations) || count($translations) !== count($pending)) {
-                throw new MediaFailure('provider_response_invalid');
+        } else {
+            $this->stage($run, 'prepare');
+            $audio = $directory.'/source.mp3';
+            if (! is_file($audio) || filesize($audio) === 0) {
+                $this->runtime->execute('ffmpeg', [
+                    '-nostdin', '-v', 'error', '-y', '-i', app(MediaStorage::class)->materialize($project, $project->source_path),
+                    '-vn', '-ac', '1', '-ar', '16000', '-b:a', '48k', '-f', 'mp3', $audio,
+                ], timeout: 180, cancelled: fn () => $this->cancelled($run), progress: fn (int $percent) => $this->stage($run, 'prepare', false, $percent), duration: (float) $project->metadata['duration']);
             }
-            $seen = [];
-            foreach ($translations as $translation) {
-                $index = $translation['index'] ?? null;
-                $text = $translation['text'] ?? null;
-                if (! is_int($index) || ! isset($pending[$index]) || isset($seen[$index]) || ! is_string($text) || trim($text) === '' || mb_strlen($text) > 1500) {
+            $this->stage($run, 'prepare', true);
+            $this->stage($run, 'transcribe');
+            $lines = $run->lines ?? [];
+            if ($lines === []) {
+                $result = $this->gemini->transcribe($audio, $run->settings['source_lang']);
+                $this->check($run);
+                $lines = $this->validateTranscript($result['segments'] ?? null, (float) $project->metadata['duration']);
+                $artifacts = $run->artifacts ?? [];
+                $artifacts['context'] = mb_substr((string) ($result['summary'] ?? ''), 0, 8000);
+                $run->forceFill(['lines' => $lines, 'artifacts' => $artifacts])->save();
+            }
+            $this->stage($run, 'transcribe', true);
+            $this->stage($run, 'context');
+            $this->stage($run, 'context', true);
+            $this->stage($run, 'translate');
+            foreach (array_chunk($lines, 30, true) as $chunk) {
+                $pending = array_filter($chunk, fn (array $line) => trim((string) ($line['text'] ?? '')) === '');
+                if ($pending === []) {
+                    continue;
+                }
+                $response = $this->gemini->translate(array_values($pending), (string) ($run->artifacts['context'] ?? ''));
+                $this->check($run);
+                $translations = $response['translations'] ?? null;
+                if (! is_array($translations) || count($translations) !== count($pending)) {
                     throw new MediaFailure('provider_response_invalid');
                 }
-                $lines[$index]['text'] = trim($text);
-                $seen[$index] = true;
+                $seen = [];
+                foreach ($translations as $translation) {
+                    $index = $translation['index'] ?? null;
+                    $text = $translation['text'] ?? null;
+                    if (! is_int($index) || ! isset($pending[$index]) || isset($seen[$index]) || ! is_string($text) || trim($text) === '' || mb_strlen($text) > 1500) {
+                        throw new MediaFailure('provider_response_invalid');
+                    }
+                    $lines[$index]['text'] = trim($text);
+                    $seen[$index] = true;
+                }
+                $run->forceFill(['lines' => $lines])->save();
+                $this->stage($run, 'translate', false, (int) floor(count(array_filter($lines, fn (array $line): bool => trim((string) ($line['text'] ?? '')) !== '')) / count($lines) * 100));
             }
-            $run->forceFill(['lines' => $lines])->save();
+            $this->stage($run, 'translate', true);
         }
-        $this->stage($run, 'translate', true);
         DB::transaction(function () use ($run, $lines): void {
             $current = MediaRun::lockForUpdate()->findOrFail($run->id);
             $project = MediaProject::lockForUpdate()->findOrFail($current->media_project_id);
@@ -106,7 +121,7 @@ class MediaPipeline
             $review = $current->settings['review_before_render'];
             $project->forceFill(['lines' => array_values($lines), 'status' => $review ? 'awaiting_review' : 'rendering'])->save();
             $current->forceFill([
-                'lines' => array_values($lines), 'status' => $review ? 'awaiting_review' : 'rendering',
+                'lines' => array_values($lines), 'status' => $review ? 'awaiting_review' : 'rendering', 'progress' => $review ? 100 : $current->progress,
                 'phase' => $review ? 'analysis' : 'generate',
             ])->save();
         });
@@ -120,7 +135,7 @@ class MediaPipeline
     {
         $this->check($run);
         $keys = $run->settings['output'] === 'srt' ? ['subtitles', 'verify', 'store'] : ($run->settings['mode'] === 'dub' ? ['voice', 'subtitles', 'render', 'verify', 'store'] : ['subtitles', 'render', 'verify', 'store']);
-        if ($run->settings['mode'] === 'dub' && $run->settings['keep_background'] && ! (in_array($run->settings['output'], ['mp3', 'wav'], true) && ($run->settings['audio_track'] ?? 'mix') === 'narration')) {
+        if ($run->settings['mode'] === 'dub' && $run->settings['output'] !== 'srt' && $run->settings['keep_background'] && ! (in_array($run->settings['output'], ['mp3', 'wav'], true) && ($run->settings['audio_track'] ?? 'mix') === 'narration')) {
             array_unshift($keys, 'separate');
         }
         $existing = $run->stages ?? [];
@@ -128,10 +143,10 @@ class MediaPipeline
         foreach ($keys as $key) {
             $stages[$key] = $existing[$key] ?? 'waiting';
         }
-        $run->forceFill(['stages' => $stages, 'progress' => 0])->save();
+        $run->forceFill(['stages' => $stages, 'stage' => 'queued', 'progress' => 0, 'artifacts' => [...($run->artifacts ?? []), 'stage_progress' => 0]])->save();
         $result = $this->renderer->render(
             $run, $this->directory($run),
-            fn (string $stage, bool $done = false) => $this->stage($run, $stage, $done),
+            fn (string $stage, bool $done = false, int $percent = 0) => $this->stage($run, $stage, $done, $percent),
             fn () => $this->cancelled($run),
         );
         $this->check($run);
@@ -145,6 +160,9 @@ class MediaPipeline
             $storage->publish($project, $result['audio'], str_ends_with($result['audio'], '.mp3') ? 'audio/mpeg' : 'audio/wav');
         }
         $storage->publish($project, $result['subtitles'], 'application/x-subrip');
+        if ($result['metadata']['styled'] ?? false) {
+            $storage->publish($project, preg_replace('/\.srt$/', '.ass', $result['subtitles']), 'text/x-ssa');
+        }
         $this->stage($run, 'store', true);
         $this->check($run);
         DB::transaction(function () use ($run, $result): void {

@@ -6,6 +6,7 @@ export function ActionTooltip({ label, children, visible = false }: { label: str
     const anchor = useRef<HTMLSpanElement>(null);
     const bubble = useRef<HTMLDivElement>(null);
     const [open, setOpen] = useState(false);
+    const dismissFocus = useRef(false);
     const shown = open || visible;
     const [position, setPosition] = useState({ left: 0, top: 0, arrow: 0, placement: 'top' });
 
@@ -35,11 +36,13 @@ export function ActionTooltip({ label, children, visible = false }: { label: str
     }, [shown]);
 
     return <span ref={anchor} className="action-tooltip-anchor"
-        onPointerEnter={event => { if (event.pointerType !== 'touch') setOpen(true); }}
-        onPointerLeave={() => { if (!anchor.current?.contains(document.activeElement)) setOpen(false); }}
-        onFocusCapture={() => setOpen(true)}
+        onPointerEnter={event => { if (event.pointerType !== 'touch') { dismissFocus.current = false; setOpen(true); } }}
+        onPointerDownCapture={() => { dismissFocus.current = true; setOpen(false); }}
+        onPointerLeave={() => setOpen(false)}
+        onFocusCapture={event => { if (!dismissFocus.current && (event.target as HTMLElement).matches(':focus-visible')) setOpen(true); }}
+        onKeyUp={event => { if (event.key === 'Tab') { dismissFocus.current = false; setOpen(true); } }}
         onBlurCapture={event => { if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false); }}
-        onClick={() => setOpen(false)}
+        onClick={() => { dismissFocus.current = true; setOpen(false); }}
         onKeyDown={event => { if (event.key === 'Escape' && open) { event.stopPropagation(); setOpen(false); } }}>
         {cloneElement(children, { 'aria-describedby': shown ? id : undefined })}
         {shown && createPortal(<div ref={bubble} id={id} role="tooltip" popover="manual" className="action-tooltip-bubble" data-placement={position.placement}

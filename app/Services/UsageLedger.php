@@ -9,6 +9,7 @@ use App\Models\MediaRun;
 use App\Models\UsageEvent;
 use App\Models\UsageRecord;
 use App\Models\User;
+use App\Support\StudioTesting;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -16,6 +17,9 @@ class UsageLedger
 {
     public function featureErrors(MediaProject $project, array $settings, ?CustomerPackageAssignment $assignment = null): array
     {
+        if (StudioTesting::enabled()) {
+            return [];
+        }
         $assignment ??= CustomerPackageAssignment::current()->where('user_id', $project->user_id)->first();
         if (! $assignment) {
             return [];
@@ -42,7 +46,7 @@ class UsageLedger
 
     public function quote(MediaProject $project): ?array
     {
-        if (! ($project->metadata['duration'] ?? 0)) {
+        if (StudioTesting::enabled() || ! ($project->metadata['duration'] ?? 0)) {
             return null;
         }
         $a = CustomerPackageAssignment::current()->where('user_id', $project->user_id)->first();
@@ -80,7 +84,7 @@ class UsageLedger
                 $this->invalid('This account cannot start processing.');
             }
             $assignment = CustomerPackageAssignment::current()->where('user_id', $user->id)->first();
-            if (($user->managed_account || $assignment) && (! $assignment || $assignment->status() !== 'active')) {
+            if (! StudioTesting::enabled() && ($user->managed_account || $assignment) && (! $assignment || $assignment->status() !== 'active')) {
                 $this->invalid('An active subscription is required.');
             }
             $snapshot = $assignment?->effectiveSnapshot();
@@ -98,7 +102,7 @@ class UsageLedger
                 ->where(fn ($q) => $q->where('reserved_videos', '>', 0)->orWhereRaw('charged_videos > returned_videos'));
             $anchor ? $prior->where('allowance_start', $anchor) : $prior->whereNull('allowance_start');
             $videos = $prior->exists() ? 0 : 1;
-            if ($assignment) {
+            if ($assignment && ! StudioTesting::enabled()) {
                 if ($seconds > ($definition['max_video_seconds'] ?? 0)) {
                     $this->invalid('The video exceeds the maximum duration for this package.');
                 }
@@ -140,7 +144,7 @@ class UsageLedger
             $user = User::lockForUpdate()->findOrFail($project->user_id);
             $record = UsageRecord::where('media_run_id', $run->id)->first();
             $definition = $record?->package_snapshot['definition'] ?? null;
-            if (! $definition) {
+            if (! $definition || StudioTesting::enabled()) {
                 return true;
             }
             $busy = MediaRun::whereHas('project', fn ($q) => $q->where('user_id', $user->id))->where('id', '!=', $run->id)
@@ -233,7 +237,7 @@ class UsageLedger
     {
         $user = User::findOrFail($userId);
         $a = $user->currentPackageAssignment;
-        if (! $a) {
+        if (! $a || StudioTesting::enabled()) {
             return;
         }
         $d = $a->effectiveSnapshot()['definition'] ?? [];
@@ -252,7 +256,7 @@ class UsageLedger
     {
         $user = User::findOrFail($project->user_id);
         $a = $user->currentPackageAssignment;
-        if (! $a) {
+        if (! $a || StudioTesting::enabled()) {
             return;
         }
         $limit = $a->effectiveSnapshot()['definition']['storage_bytes'] ?? null;

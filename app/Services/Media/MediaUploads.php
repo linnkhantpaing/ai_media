@@ -48,8 +48,8 @@ class MediaUploads
             'title' => Str::limit($title, 250, ''), 'source_name' => $data['filename'],
             'source_extension' => $extension, 'source_path' => 'media/'.$id.'/source.'.$extension,
             'expected_bytes' => $data['size'], 'fingerprint' => $data['fingerprint'] ?? null,
-            'settings' => MediaSettings::defaults(), 'status' => 'uploading', 'lines' => [],
-            'storage_profile_id' => app(StorageSettings::class)->capture(), 'storage_policy' => app(StorageSettings::class)->policy(), 'storage_disk' => app(StorageSettings::class)->connection()['disk'],
+            'settings' => MediaSettings::defaults($userId), 'status' => 'uploading', 'lines' => [],
+            'storage_profile_id' => app(StorageSettings::class)->capture(), 'storage_policy' => app(StorageSettings::class)->limits(), 'storage_disk' => app(StorageSettings::class)->connection()['disk'],
         ])->save();
         $disk->makeDirectory('media/'.$id);
 

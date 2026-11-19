@@ -196,6 +196,7 @@ const words = {
     validation_failed: ['Check the highlighted settings and try again.', 'ဖြည့်ထားသော သတ်မှတ်ချက်များကို စစ်ဆေးပြီး ပြန်ကြိုးစားပါ။', 'กรุณาตรวจสอบการตั้งค่าแล้วลองอีกครั้ง'],
     platform_maintenance: ['The platform is under maintenance. New processing is temporarily paused. History and downloads remain available.', 'စနစ် ပြုပြင်ထိန်းသိမ်းနေသဖြင့် အလုပ်အသစ်များ ခဏရပ်ထားသည်။ မှတ်တမ်းနှင့် ဒေါင်းလုဒ်များ ဆက်သုံးနိုင်သည်။', 'ระบบกำลังบำรุงรักษา หยุดงานใหม่ชั่วคราว ประวัติและการดาวน์โหลดยังใช้ได้'],
     processing_failed: ['Processing could not finish. Your saved video and script are kept. Retry or adjust setup.', 'လုပ်ဆောင်မှု မပြီးပါ။ သိမ်းထားသော ဗီဒီယိုနှင့် စာမူကို ထိန်းထားသည်။ ပြန်ကြိုးစားပါ။', 'ประมวลผลไม่สำเร็จ ระบบเก็บวิดีโอและบทไว้แล้ว กรุณาลองใหม่หรือปรับการตั้งค่า'],
+    narration_timing_mismatch: ['Narration no longer matches the selected speed. Adjust Script to Speed again.', 'အသံနှင့် ပြောနှုန်း မကိုက်တော့ပါ။ ပြောနှုန်းအလိုက် စာမူပြန်ညှိပါ။', 'เสียงไม่ตรงกับความเร็วที่เลือก โปรดปรับบทตามความเร็วอีกครั้ง'],
     pollError: ['Status could not refresh. Reconnecting…', 'အခြေအနေကို ပြန်ဖတ်၍မရပါ။ ပြန်ချိတ်နေသည်…', 'อัปเดตสถานะไม่ได้ กำลังเชื่อมต่อใหม่…'],
 } satisfies Record<string, [string, string, string]>;
 

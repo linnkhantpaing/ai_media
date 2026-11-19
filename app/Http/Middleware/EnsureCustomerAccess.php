@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Support\StudioTesting;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -33,7 +34,7 @@ class EnsureCustomerAccess
         }
         $request->session()->put($key, $user->auth_version);
 
-        if ($request->routeIs('media.initialize', 'media.youtube', 'media.upload', 'media.complete', 'media.import.retry', 'media.reopen', 'media.start', 'media.generate', 'media.retry', 'media.preview.create')) {
+        if (! StudioTesting::enabled() && $request->routeIs('media.initialize', 'media.youtube', 'media.upload', 'media.complete', 'media.import.retry', 'media.reopen', 'media.start', 'media.generate', 'media.retry', 'media.preview.create')) {
             $assignment = $user->currentPackageAssignment;
             if (($user->managed_account || $assignment) && (! $assignment || $assignment->status() !== 'active')) {
                 return response()->json(['code' => 'subscription_unavailable'], 403);

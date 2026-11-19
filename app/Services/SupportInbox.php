@@ -9,6 +9,7 @@ use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -173,28 +174,9 @@ class SupportInbox
         $rows = $query->select('m.*', 's.name as sender_name')->orderByDesc('m.id')->limit(61)->get();
         $hasOlder = $rows->count() > 60;
         $rows = $rows->take(60)->reverse()->values();
-        $attachments = DB::table('support_attachments')->whereIn('message_id', $rows->whereNull('deleted_at')->pluck('id'))->get()->groupBy('message_id');
         $read = (int) DB::table('support_reads')->where('conversation_id', $id)->where('user_id', $actor->id)->value('last_message_id');
         $customerRead = (int) DB::table('support_reads')->where('conversation_id', $id)->where('user_id', $c->customer_id)->value('last_message_id');
-        $ids = $rows->pluck('reply_to')->filter();
-        $replyQuery = DB::table('support_messages')->where('conversation_id', $id)->whereIn('id', $ids);
-        if (! $admin) {
-            $replyQuery->where('kind', '!=', 'note');
-        }
-        $references = $replyQuery->get(['id', 'body', 'kind', 'deleted_at'])->keyBy('id');
-        $messages = $rows->map(function ($m) use ($actor, $attachments, $admin, $id, $customerRead, $references): array {
-            $reply = $m->reply_to ? $references->get($m->reply_to) : null;
-
-            return ['id' => $m->id, 'kind' => $m->kind, 'sender_kind' => $m->sender_kind, 'sender' => $m->sender_name,
-                'body' => $m->deleted_at ? '' : $m->body, 'deleted' => $m->deleted_at !== null,
-                'can_delete' => $admin && $m->sender_kind === 'admin' && $m->sender_id === $actor->id && $m->kind !== 'event' && $m->deleted_at === null, 'event' => $m->event ? json_decode($m->event, true) : null, 'at' => $this->iso($m->created_at),
-                'request_id' => $m->request_id, 'read_by_customer' => $m->kind === 'reply' && $m->sender_kind === 'admin' && $customerRead >= $m->id,
-                'reply' => ! $m->deleted_at && $reply ? ['id' => $reply->id, 'body' => $reply->deleted_at ? '' : mb_substr($reply->body, 0, 180), 'kind' => $reply->kind, 'deleted' => $reply->deleted_at !== null] : null,
-                'attachments' => ($attachments->get($m->id) ?? collect())->map(fn ($a) => [
-                    'id' => $a->id, 'name' => $a->name, 'mime' => $a->mime, 'bytes' => $a->bytes,
-                    'url' => route($admin ? 'admin.support.attachment' : 'support.attachment', ['conversation' => $id, 'attachment' => $a->id], absolute: false),
-                ])->all()];
-        })->all();
+        $messages = $this->messagePayloads($rows, $actor, $admin, $customerRead);
         $deletedQuery = DB::table('support_messages')->where('conversation_id', $id)->whereNotNull('deleted_at')
             ->whereBetween('id', [$loadedFrom ?? ($rows->first()?->id ?? 0), $rows->last()?->id ?? 0]);
         if (! $admin) {
@@ -211,6 +193,169 @@ class SupportInbox
             'customer' => ['id' => $user->id, 'name' => $user->name, 'email' => $user->email],
             'messages' => $messages, 'deleted_ids' => $deletedIds, 'has_older' => $hasOlder, 'read_through' => $read,
             'latest_id' => $rows->last()?->id ?? 0, 'context' => $context, 'related' => $related];
+    }
+
+    private function messagePayloads(Collection $rows, User $actor, bool $admin, int $customerRead = 0): array
+    {
+        $attachments = DB::table('support_attachments')->whereIn('message_id', $rows->whereNull('deleted_at')->pluck('id'))->get()->groupBy('message_id');
+        $replyQuery = DB::table('support_messages')->whereIn('id', $rows->pluck('reply_to')->filter())
+            ->whereIn('conversation_id', $rows->pluck('conversation_id')->unique());
+        if (! $admin) {
+            $replyQuery->where('kind', 'reply');
+        }
+        $references = $replyQuery->get(['id', 'conversation_id', 'body', 'kind', 'deleted_at'])->keyBy('id');
+
+        return $rows->map(function ($message) use ($actor, $attachments, $admin, $customerRead, $references): array {
+            $reply = $references->get($message->reply_to);
+            $deleted = $message->deleted_at !== null;
+            $mine = $message->sender_id === $actor->id && $message->sender_kind === ($admin ? 'admin' : 'customer');
+
+            return ['id' => $message->id, 'kind' => $message->kind, 'sender_kind' => $message->sender_kind, 'sender' => $message->sender_name,
+                'body' => $deleted ? '' : $message->body, 'deleted' => $deleted, 'edited' => ! $deleted && $message->updated_at > $message->created_at,
+                'can_delete' => $mine && ! $deleted && $message->kind !== 'event',
+                'can_edit' => ! $admin && $mine && ! $deleted && $message->kind === 'reply' && filled($message->body),
+                'event' => $message->event ? json_decode($message->event, true) : null, 'at' => $this->iso($message->created_at),
+                'request_id' => $message->request_id,
+                'read_by_customer' => $message->kind === 'reply' && $message->sender_kind === 'admin' && $customerRead >= $message->id,
+                'reply' => ! $deleted && $reply && $reply->conversation_id === $message->conversation_id ? [
+                    'id' => $reply->id, 'body' => $reply->deleted_at ? '' : mb_substr($reply->body, 0, 180),
+                    'kind' => $reply->kind, 'deleted' => $reply->deleted_at !== null,
+                ] : null,
+                'attachments' => ($attachments->get($message->id) ?? collect())->map(fn ($file) => [
+                    'id' => $file->id, 'name' => $file->name, 'mime' => $file->mime, 'bytes' => $file->bytes,
+                    'url' => route($admin ? 'admin.support.attachment' : 'support.attachment', ['conversation' => $message->conversation_id, 'attachment' => $file->id], absolute: false),
+                ])->all()];
+        })->values()->all();
+    }
+
+    private function customerMessages(User $actor): Builder
+    {
+        abort_if($actor->is_admin, 403);
+
+        return DB::table('support_messages as m')
+            ->join('support_conversations as c', 'c.id', '=', 'm.conversation_id')
+            ->where('c.customer_id', $actor->id)->where('m.kind', 'reply');
+    }
+
+    public function customerChatUnread(User $actor): int
+    {
+        abort_if($actor->is_admin, 403);
+
+        return $this->customerMessages($actor)
+            ->leftJoin('support_reads as r', fn ($join) => $join->on('r.conversation_id', '=', 'c.id')->where('r.user_id', $actor->id))
+            ->where('m.sender_kind', 'admin')->whereNull('m.deleted_at')
+            ->whereRaw('m.id > COALESCE(r.last_message_id, 0)')->count();
+    }
+
+    public function customerChat(User $actor, ?int $before, ?int $after, ?int $loadedFrom, ?int $since): array
+    {
+        $snapshot = now();
+        $query = $this->customerMessages($actor)->leftJoin('users as s', 's.id', '=', 'm.sender_id')
+            ->select('m.*', 's.name as sender_name');
+        $page = clone $query;
+        if ($before) {
+            $page->where('m.id', '<', $before);
+        }
+        if ($after !== null) {
+            $page->where('m.id', '>', $after)->orderBy('m.id');
+        } else {
+            $page->orderByDesc('m.id');
+        }
+        $raw = $page->limit(61)->get();
+        $rows = $raw->take(60);
+        if ($after === null) {
+            $rows = $rows->reverse();
+        }
+        $changes = collect();
+        if ($after !== null && $loadedFrom && $since !== null) {
+            $floor = CarbonImmutable::createFromTimestampUTC(min($since, $snapshot->timestamp))->subSeconds(15);
+            $changes = (clone $query)->leftJoin('support_messages as quoted', 'quoted.id', '=', 'm.reply_to')
+                ->whereBetween('m.id', [$loadedFrom, $after])
+                ->where(fn (Builder $items) => $items->where('m.updated_at', '>=', $floor)->orWhere('quoted.updated_at', '>=', $floor))
+                ->orderByDesc('m.id')->limit(121)->get();
+        }
+
+        return ['messages' => $this->messagePayloads($rows, $actor, false),
+            'changes' => $changes->count() > 120 ? [] : $this->messagePayloads($changes, $actor, false),
+            'reset' => $changes->count() > 120,
+            'has_older' => $after === null && $raw->count() > 60,
+            'has_newer' => $after !== null && $raw->count() > 60,
+            'snapshot' => $snapshot->timestamp,
+            'unread' => $this->customerChatUnread($actor)];
+    }
+
+    public function sendCustomerChat(User $actor, array $data, array $files): int
+    {
+        abort_if($actor->is_admin, 403);
+
+        // The customer row serializes initial sends and keeps retries in their original case.
+        return DB::transaction(function () use ($actor, $data, $files): int {
+            User::whereKey($actor->id)->lockForUpdate()->firstOrFail();
+            if ($prior = $this->customerMessages($actor)->where('m.request_id', $data['request_id'])->first(['m.conversation_id'])) {
+                return $this->send($actor, $prior->conversation_id, $data, $files, false);
+            }
+            if (filled($data['reply_to'] ?? null)) {
+                $target = $this->customerMessages($actor)->where('m.id', $data['reply_to'])->value('m.conversation_id');
+                if (! $target) {
+                    throw ValidationException::withMessages(['reply_to' => 'Choose an available message in this chat.']);
+                }
+
+                return $this->send($actor, $target, $data, $files, false);
+            }
+
+            $priorConversation = DB::table('support_conversations')->where('request_id', $data['request_id'])->where('customer_id', $actor->id)->exists();
+            $general = DB::table('support_conversations')->where('customer_id', $actor->id)
+                ->whereNull('related_type')->orderByDesc('id')->value('id');
+
+            if ($general && ! $priorConversation) {
+                return $this->send($actor, $general, $data, $files, false);
+            }
+
+            $id = $this->create($actor, $data + ['subject' => 'Customer support', 'category' => 'general'], $files, false);
+
+            return (int) DB::table('support_messages')->where('conversation_id', $id)->orderBy('id')->value('id');
+        });
+    }
+
+    public function readCustomerChat(User $actor, int $through): int
+    {
+        $visible = $this->customerMessages($actor);
+        abort_unless((clone $visible)->where('m.id', $through)->exists(), 404);
+        $read = $visible->leftJoin('support_reads as r', fn ($join) => $join->on('r.conversation_id', '=', 'c.id')->where('r.user_id', $actor->id))
+            ->where('m.sender_kind', 'admin')->whereNull('m.deleted_at')->where('m.id', '<=', $through)
+            ->whereRaw('m.id > COALESCE(r.last_message_id, 0)')->groupBy('m.conversation_id')
+            ->selectRaw('m.conversation_id, MAX(m.id) as through')->get();
+        foreach ($read as $row) {
+            $this->markRead($actor, (int) $row->conversation_id, (int) $row->through, false);
+        }
+
+        return $this->customerChatUnread($actor);
+    }
+
+    public function changeCustomerMessage(User $actor, int $messageId, ?string $body): void
+    {
+        $message = $this->customerMessages($actor)->where('m.id', $messageId)->first(['m.conversation_id']);
+        abort_unless($message, 404);
+        if ($body === null) {
+            $this->deleteMessage($actor, $message->conversation_id, $messageId, false);
+
+            return;
+        }
+
+        DB::transaction(function () use ($actor, $message, $messageId, $body): void {
+            $conversation = DB::table('support_conversations')->where('id', $message->conversation_id)->lockForUpdate()->firstOrFail();
+            $row = DB::table('support_messages')->where('id', $messageId)->lockForUpdate()->firstOrFail();
+            abort_unless($row->sender_kind === 'customer' && $row->sender_id === $actor->id, 403);
+            abort_if($row->deleted_at || blank($row->body), 409);
+            if ($row->body === $body) {
+                return;
+            }
+            $editedAt = max(now()->timestamp, CarbonImmutable::parse($row->created_at, 'UTC')->timestamp + 1);
+            DB::table('support_messages')->where('id', $messageId)->update(['body' => $body, 'updated_at' => CarbonImmutable::createFromTimestampUTC($editedAt)]);
+            DB::table('support_conversations')->where('id', $conversation->id)->update(['revision' => $conversation->revision + 1, 'updated_at' => now()]);
+            app(AuditTrail::class)->record('support', $messageId.':edit:'.($conversation->revision + 1), 'accounts', 'support.message_edited', 'success',
+                $actor->id, 'support', (string) $conversation->id, $this->reference($conversation->id), ['message_id' => $messageId]);
+        });
     }
 
     public function customerContext(User $user): array
@@ -433,14 +578,14 @@ class SupportInbox
         }
     }
 
-    public function deleteMessage(User $actor, int $id, int $messageId): void
+    public function deleteMessage(User $actor, int $id, int $messageId, bool $admin = true): void
     {
-        $this->authorize($actor, $id, true);
-        DB::transaction(function () use ($actor, $id, $messageId): void {
+        $this->authorize($actor, $id, $admin);
+        DB::transaction(function () use ($actor, $id, $messageId, $admin): void {
             $conversation = DB::table('support_conversations')->where('id', $id)->lockForUpdate()->firstOrFail();
             $message = DB::table('support_messages')->where('conversation_id', $id)->where('id', $messageId)->lockForUpdate()->first();
             abort_unless($message, 404);
-            abort_unless($message->sender_kind === 'admin' && $message->sender_id === $actor->id && $message->kind !== 'event', 403);
+            abort_unless($message->sender_kind === ($admin ? 'admin' : 'customer') && $message->sender_id === $actor->id && ($admin ? $message->kind !== 'event' : $message->kind === 'reply'), 403);
             if ($message->deleted_at !== null) {
                 return;
             }

@@ -7,6 +7,7 @@ use App\Models\MediaProject;
 use App\Services\CustomerAccounts;
 use App\Services\Media\MediaInspector;
 use App\Services\Media\MediaStorage;
+use App\Services\Media\OperationsTelemetry;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -43,12 +44,21 @@ class InspectMediaProject implements ShouldBeUnique, ShouldQueue
 
             return;
         }
+        $report = function (int $percent) use ($project): void {
+            MediaProject::whereKey($project->id)->where('status', 'validating')->update(['source_progress' => $percent]);
+            if ($current = MediaProject::find($project->id)) {
+                app(OperationsTelemetry::class)->syncSource($current);
+            }
+        };
         try {
-            $metadata = $inspector->inspect($project);
+            $report($project->source_type === 'youtube' ? 90 : 1);
+            $metadata = $inspector->inspect($project, fn (int $percent) => $report($project->source_type === 'youtube' ? 90 + (int) floor($percent * 0.04) : max(1, (int) floor($percent * 0.9))));
+            $report(94);
             $storage->publish($project, $project->source_path, $metadata['mime']);
+            $report(98);
             $storage->publish($project, 'media/'.$project->id.'/poster.jpg', 'image/jpeg');
             MediaProject::whereKey($project->id)->where('status', 'validating')->update([
-                'status' => 'ready', 'error_code' => null, 'import_stage' => $project->source_type === 'youtube' ? 'completed' : null, 'source_mime' => $metadata['mime'],
+                'status' => 'ready', 'source_progress' => 100, 'error_code' => null, 'import_stage' => $project->source_type === 'youtube' ? 'completed' : null, 'source_mime' => $metadata['mime'],
                 'metadata' => json_encode($metadata, JSON_THROW_ON_ERROR),
             ]);
         } catch (MediaFailure $error) {

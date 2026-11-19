@@ -3,6 +3,9 @@ import type { SharedData } from '@/types';
 
 const messages = {
     "en": {
+"account": "Account",
+"billing": "Billing & Payments",
+"myPlan": "My Plan & Usage",
         "userAccess": "User Access",
         "breadcrumb": "Breadcrumb",
         "language": "Language",
@@ -101,6 +104,9 @@ const messages = {
         "welcomeBack": "Welcome back"
     },
     "my": {
+"account": "အကောင့်",
+"billing": "ငွေပေးချေမှုများ",
+"myPlan": "ကျွန်ုပ်၏ ပက်ကေ့ချ်နှင့် အသုံးပြုမှု",
         "userAccess": "အသုံးပြုသူ ဝင်ရောက်ရန်",
         "breadcrumb": "လမ်းညွှန်အစီအစဉ်",
         "language": "ဘာသာစကား",
@@ -199,6 +205,9 @@ const messages = {
         "welcomeBack": "ပြန်လည်ကြိုဆိုပါတယ်"
     },
     "th": {
+"account": "บัญชี",
+"billing": "การเรียกเก็บเงินและการชำระเงิน",
+"myPlan": "แพ็กเกจและการใช้งานของฉัน",
         "userAccess": "การเข้าถึงสำหรับผู้ใช้",
         "breadcrumb": "เส้นทางการนำทาง",
         "language": "ภาษา",

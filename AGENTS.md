@@ -140,3 +140,6 @@ Before relying on a package's API, confirm its installed version:
 - Phase 1 navigation uses the approved sidebar and contextual project workflow tabs. Projects contains only All Projects; Drafts, Awaiting Review, Processing, Completed and Needs Attention are filters inside that form, not separate sidebar or navigation-search entries. Highlight All Projects for every library status view. Do not show fictional subscription balances or expiry dates.
 
 - Use the shared LoadingProvider and useLoading from resources/js/lib/loading.tsx for blocking UI loading. Inertia navigation uses it automatically; keep background polling silent with showProgress: false. Preserve the themed centered blur overlay instead of adding separate page loaders.
+
+- Card styling preference (2026-11-18): keep cards very compact, omit outer borders and use subtle raised 3D box shadows. Keep modal Close/Cancel buttons compact and pill-shaped. My Plan Usage Details opens as an animated right-side panel, not a centered modal.
+- My Plan Usage Details preference (2026-11-18): narrow right-side drawer (480px maximum), square outer corners, compact 10–12px content, short fixed header/footer; no footer Close button. Keep the top close control.

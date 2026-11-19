@@ -1,6 +1,7 @@
 <?php
 
 return [
+    'studio_testing' => (bool) env('MEDIA_STUDIO_TESTING', true),
     'storage_limit_bytes' => (int) env('MEDIA_STORAGE_LIMIT_BYTES', 4294967296),
     'max_upload_bytes' => (int) env('MEDIA_MAX_UPLOAD_BYTES', 2147483648),
     'max_duration_seconds' => (int) env('MEDIA_MAX_DURATION_SECONDS', 600),
@@ -14,6 +15,9 @@ return [
     'gemini_model' => env('GEMINI_MODEL', 'gemini-3.8-flash'),
     'gemini_tts_model' => env('GEMINI_TTS_MODEL', 'gemini-3.8-flash-tts'),
     'gemini_revision' => env('GEMINI_API_REVISION', '2026-05-20'),
+    'analysis_concurrency' => 3,
+    'analysis_request_timeout' => 180,
+    'analysis_slice_seconds' => 600,
     'provider_timeout' => (int) env('MEDIA_PROVIDER_TIMEOUT', 240),
     'voices' => ['Kore', 'Charon', 'Fenrir', 'Aoede', 'Orus', 'Leda'],
     'separation_command' => env('MEDIA_SEPARATION_COMMAND'),

@@ -18,7 +18,7 @@ class MediaProject extends Model
 
     protected function casts(): array
     {
-        return ['storage_policy' => 'array', 'source_expires_at' => 'datetime', 'artifacts_expires_at' => 'datetime', 'source_expired_at' => 'datetime', 'metadata' => 'array', 'settings' => 'array', 'lines' => 'array', 'expected_bytes' => 'integer', 'uploaded_bytes' => 'integer', 'imported_bytes' => 'integer', 'import_cancel_requested' => 'boolean'];
+        return ['storage_policy' => 'array', 'source_expires_at' => 'datetime', 'artifacts_expires_at' => 'datetime', 'source_expired_at' => 'datetime', 'metadata' => 'array', 'settings' => 'array', 'lines' => 'array', 'expected_bytes' => 'integer', 'uploaded_bytes' => 'integer', 'source_progress' => 'integer', 'imported_bytes' => 'integer', 'import_cancel_requested' => 'boolean'];
     }
 
     public function user(): BelongsTo

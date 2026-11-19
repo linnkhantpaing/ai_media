@@ -55,6 +55,86 @@ class SupportInboxTest extends TestCase
         return $message;
     }
 
+    public function test_customer_chat_combines_owned_cases_and_routes_quoted_replies(): void
+    {
+        $first = $this->conversation();
+        $firstMessage = $this->getJson('/admin/support/'.$first)->json('messages.0.id');
+        $this->travel(1)->day();
+        $second = $this->postJson('/admin/support', $this->data(['body' => 'A later admin reply']))->assertCreated()->json('id');
+        $secondMessage = $this->getJson('/admin/support/'.$second)->json('messages.0.id');
+        $private = $this->postJson('/admin/support/'.$first.'/messages', ['kind' => 'note', 'body' => 'Private admin note', 'request_id' => (string) Str::uuid()])->assertCreated()->json('id');
+        $other = $this->postJson('/admin/support', $this->data(['customer_id' => User::factory()->create()->id, 'body' => 'Other customer']))->assertCreated()->json('id');
+        $foreign = $this->getJson('/admin/support/'.$other)->json('messages.0.id');
+        auth('admin')->logout();
+        $this->actingAs($this->customer, 'web');
+
+        $this->getJson('/support-api/chat?badge=1')->assertExactJson(['unread' => 2]);
+        $timeline = $this->getJson('/support-api/chat')->assertOk()->assertJsonCount(2, 'messages')
+            ->assertJsonPath('messages.0.id', $firstMessage)->assertJsonPath('messages.1.id', $secondMessage);
+        $this->assertNotSame(substr($timeline->json('messages.0.at'), 0, 10), substr($timeline->json('messages.1.at'), 0, 10));
+        $this->postJson('/support-api/chat/read', ['through' => $firstMessage])->assertExactJson(['unread' => 1]);
+        $this->postJson('/support-api/chat/read', ['through' => $secondMessage])->assertExactJson(['unread' => 0]);
+        $this->postJson('/support-api/chat/read', ['through' => $foreign])->assertNotFound();
+
+        foreach ([$foreign, $private] as $target) {
+            $this->postJson('/support-api/chat/messages', ['body' => 'Reply', 'reply_to' => $target, 'request_id' => (string) Str::uuid()])
+                ->assertUnprocessable()->assertJsonValidationErrors('reply_to');
+        }
+
+        $reply = ['body' => 'Reply to the older message', 'reply_to' => $firstMessage, 'request_id' => (string) Str::uuid()];
+        $posted = $this->postJson('/support-api/chat/messages', $reply)->assertCreated()->json('id');
+        $this->postJson('/support-api/chat/messages', $reply)->assertCreated()->assertJsonPath('id', $posted);
+        $this->assertDatabaseHas('support_messages', ['id' => $posted, 'conversation_id' => $first, 'reply_to' => $firstMessage]);
+        $this->getJson('/support-api/chat?after='.$secondMessage)->assertOk()
+            ->assertJsonCount(1, 'messages')->assertJsonPath('messages.0.reply.id', $firstMessage);
+        $this->travelBack();
+    }
+
+    public function test_customer_chat_reuses_initial_case_and_syncs_edits_and_deleted_quotes(): void
+    {
+        auth('admin')->logout();
+        $this->actingAs($this->customer, 'web');
+        $this->getJson('/support-api/chat')
+            ->assertJsonCount(0, 'messages')
+            ->assertJsonCount(0, 'changes')
+            ->assertJsonPath('has_older', false)
+            ->assertJsonPath('has_newer', false)
+            ->assertJsonPath('reset', false)
+            ->assertJsonPath('unread', 0);
+        $firstData = ['body' => 'First customer message', 'request_id' => (string) Str::uuid()];
+        $first = $this->postJson('/support-api/chat/messages', $firstData)->assertCreated()->json('id');
+        $this->postJson('/support-api/chat/messages', $firstData)->assertCreated()->assertJsonPath('id', $first);
+        $followup = ['body' => 'Follow-up', 'request_id' => (string) Str::uuid()];
+        $this->postJson('/support-api/chat/messages', $followup)->assertCreated();
+        $this->assertDatabaseCount('support_conversations', 1);
+        $id = DB::table('support_conversations')->value('id');
+        $this->actingAs($this->admin, 'admin');
+        $adminReply = $this->postJson('/admin/support/'.$id.'/messages', ['kind' => 'reply', 'body' => 'Received',
+            'reply_to' => $first, 'request_id' => (string) Str::uuid()])->assertCreated()->json('id');
+        auth('admin')->logout();
+        $this->actingAs($this->customer, 'web');
+        $snapshot = $this->getJson('/support-api/chat')->assertJsonPath('messages.0.can_edit', true)->json('snapshot');
+        $this->patchJson('/support-api/chat/messages/'.$adminReply, ['body' => 'Other sender'])->assertForbidden();
+        $this->deleteJson('/support-api/chat/messages/'.$adminReply)->assertForbidden();
+        $this->patchJson('/support-api/chat/messages/'.$first, ['body' => ''])->assertUnprocessable();
+        $this->patchJson('/support-api/chat/messages/'.$first, ['body' => 'Edited text'])->assertOk();
+        $url = '/support-api/chat?after='.$adminReply.'&loaded_from='.$first.'&since='.$snapshot;
+        $this->getJson($url)->assertJsonPath('changes.0.reply.body', 'Edited text')
+            ->assertJsonPath('changes.2.edited', true);
+        $this->actingAs(User::factory()->create(), 'web');
+        $this->patchJson('/support-api/chat/messages/'.$first, ['body' => 'Other account'])->assertNotFound();
+        $this->deleteJson('/support-api/chat/messages/'.$first)->assertNotFound();
+        $this->actingAs($this->customer, 'web');
+        $this->deleteJson('/support-api/chat/messages/'.$first)->assertOk();
+        $this->deleteJson('/support-api/chat/messages/'.$first)->assertOk();
+        $this->postJson('/support-api/chat/messages', $firstData)->assertCreated()->assertJsonPath('id', $first);
+        $this->patchJson('/support-api/chat/messages/'.$first, ['body' => 'Restore'])->assertConflict();
+        $this->getJson($url)->assertJsonPath('changes.0.reply.deleted', true)->assertJsonPath('changes.0.reply.body', '');
+        $this->assertDatabaseHas('support_messages', ['id' => $first, 'body' => '']);
+        $this->actingAs($this->admin, 'admin');
+        $this->getJson('/admin/support/'.$id)->assertJsonPath('messages.0.deleted', true)->assertJsonPath('messages.2.reply.deleted', true);
+    }
+
     public function test_deleting_own_reply_redacts_attachments_quotes_and_is_idempotent(): void
     {
         $id = $this->post('/admin/support', $this->data(['body' => 'delete-content-canary', 'files' => [UploadedFile::fake()->image('proof.png')]]), ['Accept' => 'application/json'])->assertCreated()->json('id');
@@ -404,5 +484,58 @@ class SupportInboxTest extends TestCase
         $id = $this->postJson('/support-api', $data)->assertCreated()->json('id');
         $this->assertDatabaseHas('support_conversations', ['id' => $id, 'customer_id' => $this->customer->id, 'status' => 'open']);
         $this->getJson('/support-api')->assertJsonCount(1, 'items');
+    }
+
+    public function test_customer_widget_creates_conversation_and_admin_reply_is_read_only_after_acknowledgement(): void
+    {
+        $this->actingAs($this->customer, 'web');
+        $data = ['subject' => 'Help with my video', 'category' => 'general', 'body' => 'My export needs help', 'request_id' => (string) Str::uuid()];
+        $id = $this->postJson('/support-api', $data)->assertCreated()->json('id');
+        $this->postJson('/support-api', $data)->assertCreated()->assertJsonPath('id', $id);
+        $this->getJson('/support-api')->assertOk()->assertJsonPath('items.0.id', $id)->assertJsonPath('counts.unread', 0);
+
+        $this->actingAs($this->admin, 'admin');
+        $reply = $this->postJson('/admin/support/'.$id.'/messages', ['kind' => 'reply', 'body' => 'Please send a screenshot', 'request_id' => (string) Str::uuid()])->assertCreated()->json('id');
+        $this->postJson('/admin/support/'.$id.'/messages', ['kind' => 'note', 'body' => 'Internal admin investigation', 'request_id' => (string) Str::uuid()])->assertCreated();
+
+        $this->actingAs($this->customer, 'web');
+        $this->getJson('/support-api')->assertJsonPath('counts.unread', 1)->assertJsonPath('items.0.unread', 1);
+        $this->getJson('/support-api/'.$id)->assertOk()->assertJsonPath('context', null)->assertJsonPath('status', 'waiting_customer')
+            ->assertJsonCount(2, 'messages')->assertJsonPath('messages.1.sender_kind', 'admin')->assertDontSee('Internal admin investigation');
+        $this->getJson('/support-api')->assertJsonPath('counts.unread', 1);
+        $this->postJson('/support-api/'.$id.'/read', ['through' => $reply])->assertOk();
+        $this->getJson('/support-api')->assertJsonPath('counts.unread', 0);
+        $this->postJson('/support-api/'.$id.'/messages', ['body' => 'Here is more detail', 'request_id' => (string) Str::uuid()])->assertCreated();
+        $this->getJson('/support-api/'.$id)->assertJsonPath('status', 'open');
+        Mail::assertNothingSent();
+    }
+
+    public function test_customer_widget_uploads_private_attachment_without_text_and_rejects_empty_message(): void
+    {
+        $this->actingAs($this->customer, 'web');
+        $id = $this->post('/support-api', ['subject' => 'Screenshot', 'category' => 'video', 'request_id' => (string) Str::uuid(),
+            'files' => [UploadedFile::fake()->image('problem.png')]], ['Accept' => 'application/json'])->assertCreated()->json('id');
+        $detail = $this->getJson('/support-api/'.$id)->assertOk()->assertJsonCount(1, 'messages.0.attachments');
+        $url = $detail->json('messages.0.attachments.0.url');
+        $this->assertStringStartsWith('/support-api/'.$id.'/attachments/', $url);
+        $this->get($url)->assertOk()->assertHeader('X-Content-Type-Options', 'nosniff');
+        $this->postJson('/support-api/'.$id.'/messages', ['body' => ' ', 'request_id' => (string) Str::uuid()])
+            ->assertUnprocessable()->assertJsonValidationErrors('body');
+        $this->actingAs(User::factory()->create(), 'web');
+        $this->get($url)->assertNotFound();
+    }
+
+    public function test_customer_poll_redacts_admin_messages_deleted_from_loaded_older_history(): void
+    {
+        $this->withoutMiddleware(ThrottleRequests::class);
+        $id = $this->conversation();
+        $first = DB::table('support_messages')->where('conversation_id', $id)->value('id');
+        for ($n = 0; $n < 62; $n++) {
+            $this->postJson('/admin/support/'.$id.'/messages', ['kind' => 'reply', 'body' => 'Reply '.$n, 'request_id' => (string) Str::uuid()])->assertCreated();
+        }
+        $this->deleteJson('/admin/support/'.$id.'/messages/'.$first)->assertOk();
+        $this->actingAs($this->customer, 'web');
+        $this->getJson('/support-api/'.$id.'?loaded_from='.$first)->assertOk()->assertJsonPath('deleted_ids.0', (int) $first)->assertJsonCount(60, 'messages');
+        $this->getJson('/support-api/'.$id.'?loaded_from=invalid')->assertUnprocessable();
     }
 }

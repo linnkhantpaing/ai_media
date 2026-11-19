@@ -187,6 +187,14 @@ class StorageSettingsTest extends TestCase
         $this->actingAs($this->admin, 'admin')->putJson('/admin/settings/storage', $data)->assertUnprocessable();
     }
 
+    public function test_long_movie_duration_can_be_configured_without_changing_existing_projects(): void
+    {
+        $project = MediaProject::factory()->create(['storage_policy' => app(StorageSettings::class)->policy()]);
+        $this->actingAs($this->admin, 'admin')->putJson('/admin/settings/storage', $this->draft(['max_duration' => 14400]))->assertOk();
+        $this->assertSame(14400, app(StorageSettings::class)->policy()['max_duration']);
+        $this->assertSame(600, $project->fresh()->storage_policy['max_duration']);
+    }
+
     public function test_untrusted_endpoints_traversal_and_invalid_policy_are_rejected(): void
     {
         $this->actingAs($this->admin, 'admin');
@@ -195,7 +203,7 @@ class StorageSettingsTest extends TestCase
             $data['connection']['endpoint'] = $endpoint;
             $this->postJson('/admin/settings/storage/test', $data)->assertUnprocessable();
         }
-        foreach ([['keep_days' => 40, 'source_days' => 30], ['source_days' => 60, 'artifact_days' => 30], ['max_duration' => 5000], ['max_bytes' => 2147483649]] as $policy) {
+        foreach ([['keep_days' => 40, 'source_days' => 30], ['source_days' => 60, 'artifact_days' => 30], ['max_duration' => 86401], ['max_bytes' => 2147483649]] as $policy) {
             $this->putJson('/admin/settings/storage', $this->draft($policy))->assertUnprocessable();
         }
         $data = $this->draft();

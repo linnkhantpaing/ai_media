@@ -9,14 +9,19 @@ use App\Models\MediaPreset;
 use App\Models\MediaPreview;
 use App\Models\MediaProject;
 use App\Models\User;
+use App\Services\Media\MediaNarrationFit;
+use App\Services\Media\MediaRenderer;
 use App\Services\Media\MediaRuntime;
 use App\Services\Media\MediaStorage;
 use App\Services\Media\ProviderSettings;
 use App\Support\MediaSettings;
+use App\Support\StudioTesting;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class MediaToolsController extends Controller
@@ -52,13 +57,24 @@ class MediaToolsController extends Controller
     public function createPreview(UpdateMediaSettingsRequest $request, string $mediaProject): JsonResponse
     {
         $project = $this->owned($request, $mediaProject);
-        $options = $request->validate(['kind' => ['required', Rule::in(['voice', 'video', 'timing', 'shorten'])], 'line' => ['sometimes', 'integer', 'min:0', 'max:499'], 'start' => ['sometimes', 'numeric', 'min:0'], 'duration' => ['sometimes', 'numeric', 'between:1,15'], 'lines' => ['sometimes', 'array', 'min:1', 'max:500'], 'lines.*.index' => ['required', 'integer', 'distinct'], 'lines.*.text' => ['required', 'string', 'max:1500']]);
+        $options = $request->validate(['action' => ['sometimes', Rule::in(['regenerate', 'hook', 'shorten', 'expand', 'names'])], 'kind' => ['required', Rule::in(['voice', 'video', 'timing', 'shorten', 'rewrite', 'fit'])], 'line' => ['sometimes', 'integer', 'min:0', 'max:5999'], 'start' => ['sometimes', 'numeric', 'min:0'], 'duration' => ['sometimes', 'numeric', 'between:1,15'], 'lines' => ['sometimes', 'array', 'min:1', 'max:6000'], 'lines.*.index' => ['required', 'integer', 'distinct'], 'lines.*.text' => ['required', 'string', 'max:1500']]);
+        $assignment = $project->user->currentPackageAssignment;
+        $feature = match ($options['kind']) {
+            'video' => 'video_preview', 'voice', 'timing' => 'voice_preview', default => 'script_edit'
+        };
+        if (! StudioTesting::enabled() && $assignment && ! ($assignment->effectiveSnapshot()['definition']['features'][$feature] ?? false)) {
+            throw ValidationException::withMessages(['kind' => 'This preview or editing tool is not included in your package.']);
+        }
+        if ($options['kind'] === 'fit' && ! StudioTesting::enabled() && $assignment && ! ($assignment->effectiveSnapshot()['definition']['features']['voice_preview'] ?? false)) {
+            throw ValidationException::withMessages(['kind' => 'Voice preview is required to measure narration timing.']);
+        }
         abort_unless(($project->metadata['audio'] ?? false) && app(MediaRuntime::class)->available(), 422);
         abort_unless(app(ProviderSettings::class)->ready(), 422);
         $settings = MediaSettings::normalize($request->validated('settings') ?? $project->settings);
-        if (in_array($options['kind'], ['voice', 'timing'], true) && $settings['mode'] !== 'dub') {
+        if (in_array($options['kind'], ['voice', 'timing', 'fit'], true) && $settings['mode'] !== 'dub') {
             abort(422);
         }
+        abort_if($options['kind'] === 'fit' && ! MediaNarrationFit::enabled($settings), 422);
         $lines = $project->lines ?? [];
         if (isset($options['lines'])) {
             $updates = collect($options['lines'])->keyBy('index');
@@ -75,17 +91,20 @@ class MediaToolsController extends Controller
         if (isset($options['line'])) {
             abort_unless(isset($lines[$options['line']]), 422);
         }
-        if ($options['kind'] === 'shorten') {
+        if (in_array($options['kind'], ['shorten', 'rewrite'], true)) {
             abort_unless(isset($options['line']), 422);
         }
         unset($options['lines']);
+        if ($options['kind'] === 'fit') {
+            $options = ['kind' => 'fit'];
+        }
         if ($options['kind'] === 'video') {
             $options['start'] = $options['start'] ?? ($lines[0]['start'] ?? 0);
             $options['duration'] = min($options['duration'] ?? 15, $project->metadata['duration'] - $options['start']);
             abort_if($options['duration'] <= 0, 422);
         }
         $providerRevision = app(ProviderSettings::class)->snapshot();
-        $key = hash('sha256', json_encode([$project->source_path, $settings, $lines, $options, $providerRevision], JSON_THROW_ON_ERROR));
+        $key = hash('sha256', json_encode([MediaRenderer::AUDIO_REVISION, $project->source_path, $settings, $lines, $options, $providerRevision, ...($options['kind'] === 'fit' ? ['fixed-target-v2'] : [])], JSON_THROW_ON_ERROR));
         $preview = DB::transaction(function () use ($project, $settings, $lines, $options, $key, $providerRevision): MediaPreview {
             $locked = MediaProject::lockForUpdate()->findOrFail($project->id);
             $cached = $locked->previews()->where('cache_key', $key)->where('status', 'completed')->latest()->first();
@@ -145,6 +164,14 @@ class MediaToolsController extends Controller
     {
         $parameters = ['mediaProject' => $preview->media_project_id, 'preview' => $preview->id];
 
-        return ['id' => $preview->id, 'kind' => $preview->kind, 'status' => $preview->status, 'progress' => $preview->progress, 'errorCode' => $preview->error_code, 'cancelRequested' => $preview->cancel_requested, 'matchesCurrent' => MediaSettings::normalize($preview->settings) == MediaSettings::normalize($preview->project->settings) && $preview->lines == ($preview->project->lines ?? []), 'result' => $preview->result, 'links' => ['status' => route('media.preview.status', $parameters, false), 'cancel' => route('media.preview.cancel', $parameters, false), 'file' => $preview->status === 'completed' && $preview->path ? route('media.preview.file', $parameters, false) : null]];
+        $result = $preview->result;
+        if ($preview->status === 'queued' && $preview->error_code === 'provider_rate_limit' && ! isset($result['retryAt'])) {
+            $available = DB::table('jobs')->where('queue', 'media')->where('payload', 'like', '%'.$preview->id.'%')->value('available_at');
+            if ($available) {
+                $result = [...($result ?? []), 'retryAt' => CarbonImmutable::createFromTimestamp((int) $available)->toIso8601String()];
+            }
+        }
+
+        return ['id' => $preview->id, 'kind' => $preview->kind, 'status' => $preview->status, 'progress' => $preview->progress, 'errorCode' => $preview->error_code, 'cancelRequested' => $preview->cancel_requested, 'matchesCurrent' => MediaSettings::normalize($preview->settings) == MediaSettings::normalize($preview->project->settings) && $preview->lines == ($preview->project->lines ?? []), 'result' => $result, 'links' => ['status' => route('media.preview.status', $parameters, false), 'cancel' => route('media.preview.cancel', $parameters, false), 'file' => $preview->status === 'completed' && $preview->path ? route('media.preview.file', $parameters, false) : null]];
     }
 }

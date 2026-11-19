@@ -19,7 +19,7 @@ class YouTubeDownloader
 
     public function inspect(string $url, string $directory, callable $cancelled): array
     {
-        $output = $this->execute([...$this->base(), '--skip-download', '--dump-single-json', '--', $this->url($url)], $directory, $cancelled, timeout: 120);
+        $output = $this->execute([...$this->base(), '--format', 'bv*[height<=1080][ext=mp4]+ba[ext=m4a]/b[height<=1080][ext=mp4]/bv*[height<=1080]+ba/b[height<=1080]', '--format-sort', 'vcodec:h264,acodec:aac', '--skip-download', '--dump-single-json', '--', $this->url($url)], $directory, $cancelled, timeout: 120);
         try {
             $info = json_decode($output, true, 512, JSON_THROW_ON_ERROR);
         } catch (\JsonException) {
@@ -42,24 +42,29 @@ class YouTubeDownloader
             throw new MediaFailure('too_large');
         }
 
-        return ['title' => mb_substr((string) ($info['title'] ?? 'YouTube video'), 0, 250), 'duration' => $duration];
+        return ['title' => mb_substr((string) ($info['title'] ?? 'YouTube video'), 0, 250), 'duration' => $duration, 'parts' => max(1, count($info['requested_formats'] ?? []))];
     }
 
-    public function download(string $url, string $directory, callable $progress, callable $cancelled): string
+    public function download(string $url, string $directory, callable $progress, callable $cancelled, int $parts = 1): string
     {
         $downloads = [];
+        $fractions = [];
+        $lastPercent = 0;
         $this->execute([
             ...$this->base(), '--newline', '--progress', '--progress-delta', '1',
-            '--progress-template', 'download:{"stage":"download","file":%(progress.filename)j,"bytes":%(progress.downloaded_bytes)j}',
+            '--progress-template', 'download:{"stage":"download","file":%(progress.filename)j,"bytes":%(progress.downloaded_bytes)j,"total":%(progress.total_bytes)j,"estimate":%(progress.total_bytes_estimate)j,"status":%(progress.status)j}',
             '--max-filesize', (string) app(StorageSettings::class)->limits()['max_bytes'],
             '--match-filters', '!is_live & duration <= '.app(StorageSettings::class)->limits()['max_duration'],
             '--format', 'bv*[height<=1080][ext=mp4]+ba[ext=m4a]/b[height<=1080][ext=mp4]/bv*[height<=1080]+ba/b[height<=1080]',
             '--format-sort', 'vcodec:h264,acodec:aac', '--merge-output-format', 'mp4', '--remux-video', 'mp4',
             '--output', 'download.%(ext)s', '--', $this->url($url),
-        ], $directory, $cancelled, function (array $event) use ($progress, &$downloads): void {
+        ], $directory, $cancelled, function (array $event) use ($progress, $parts, &$downloads, &$fractions, &$lastPercent): void {
             if (($event['stage'] ?? '') === 'download' && is_string($event['file'] ?? null) && is_numeric($event['bytes'] ?? null)) {
                 $downloads[$event['file']] = max($downloads[$event['file']] ?? 0, (int) $event['bytes']);
-                $progress(array_sum($downloads));
+                $total = is_numeric($event['total'] ?? null) && $event['total'] > 0 ? $event['total'] : ($event['estimate'] ?? null);
+                $fractions[$event['file']] = ($event['status'] ?? '') === 'finished' ? 1 : (is_numeric($total) && $total > 0 ? min(1, $downloads[$event['file']] / $total) : 0);
+                $lastPercent = max($lastPercent, min(99, (int) floor(array_sum($fractions) / max($parts, count($downloads)) * 100)));
+                $progress(array_sum($downloads), $lastPercent);
             }
         }, timeout: 600);
         $file = $directory.'/download.mp4';
@@ -69,6 +74,8 @@ class YouTubeDownloader
         if (filesize($file) > app(StorageSettings::class)->limits()['max_bytes']) {
             throw new MediaFailure('too_large');
         }
+
+        $progress(filesize($file), 100);
 
         return $file;
     }
@@ -115,7 +122,7 @@ class YouTubeDownloader
                     $line = trim(substr($buffers[$type], 0, $end));
                     $buffers[$type] = substr($buffers[$type], $end + 1);
                     $event = json_decode($line, true);
-                    if (is_array($event) && microtime(true) - $lastProgress >= 0.5) {
+                    if (is_array($event) && (($event['status'] ?? '') === 'finished' || microtime(true) - $lastProgress >= 0.5)) {
                         $lastProgress = microtime(true);
                         $progress($event);
                     }

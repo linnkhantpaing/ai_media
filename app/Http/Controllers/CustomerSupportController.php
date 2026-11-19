@@ -12,6 +12,54 @@ use Symfony\Component\HttpFoundation\Response;
 
 class CustomerSupportController extends Controller
 {
+    public function chat(Request $request, SupportInbox $inbox): JsonResponse
+    {
+        $input = $request->validate([
+            'badge' => ['sometimes', 'boolean'],
+            'before' => ['nullable', 'integer', 'min:1', 'prohibits:after'],
+            'after' => ['nullable', 'integer', 'min:0'],
+            'loaded_from' => ['nullable', 'integer', 'min:1', 'required_with:since'],
+            'since' => ['nullable', 'integer', 'min:0', 'required_with:loaded_from'],
+        ]);
+
+        $result = $request->boolean('badge')
+            ? ['unread' => $inbox->customerChatUnread($request->user())]
+            : $inbox->customerChat($request->user(), $input['before'] ?? null, $input['after'] ?? null, $input['loaded_from'] ?? null, $input['since'] ?? null);
+
+        return response()->json($result)->header('Cache-Control', 'private, no-store');
+    }
+
+    public function sendChat(Request $request, SupportInbox $inbox): JsonResponse
+    {
+        $input = $request->validate(SupportController::messageRules() + ['kind' => ['prohibited']]);
+        $id = $inbox->sendCustomerChat($request->user(), $input, $request->file('files', []));
+
+        return response()->json(['id' => $id], 201)->header('Cache-Control', 'private, no-store');
+    }
+
+    public function readChat(Request $request, SupportInbox $inbox): JsonResponse
+    {
+        $request->validate(['through' => ['required', 'integer', 'min:1']]);
+        $unread = $inbox->readCustomerChat($request->user(), $request->integer('through'));
+
+        return response()->json(['unread' => $unread])->header('Cache-Control', 'private, no-store');
+    }
+
+    public function editChatMessage(Request $request, SupportInbox $inbox, int $message): JsonResponse
+    {
+        $input = $request->validate(['body' => ['required', 'string', 'max:4000']]);
+        $inbox->changeCustomerMessage($request->user(), $message, trim($input['body']));
+
+        return response()->json(['saved' => true])->header('Cache-Control', 'private, no-store');
+    }
+
+    public function deleteChatMessage(Request $request, SupportInbox $inbox, int $message): JsonResponse
+    {
+        $inbox->changeCustomerMessage($request->user(), $message, null);
+
+        return response()->json(['deleted' => true])->header('Cache-Control', 'private, no-store');
+    }
+
     public function index(Request $request, SupportInbox $inbox): JsonResponse
     {
         $filters = $request->validate(['page' => ['nullable', 'integer', 'min:1', 'max:1000000'], 'tab' => ['nullable', Rule::in(['all', 'unread', 'resolved'])]]);
@@ -32,9 +80,9 @@ class CustomerSupportController extends Controller
 
     public function show(Request $request, SupportInbox $inbox, int $conversation): JsonResponse
     {
-        $v = $request->validate(['before' => ['nullable', 'integer', 'min:1']]);
+        $v = $request->validate(['before' => ['nullable', 'integer', 'min:1'], 'loaded_from' => ['nullable', 'integer', 'min:1']]);
 
-        return response()->json($inbox->detail($request->user(), $conversation, false, isset($v['before']) ? (int) $v['before'] : null))->header('Cache-Control', 'private, no-store');
+        return response()->json($inbox->detail($request->user(), $conversation, false, isset($v['before']) ? (int) $v['before'] : null, isset($v['loaded_from']) ? (int) $v['loaded_from'] : null))->header('Cache-Control', 'private, no-store');
     }
 
     public function send(Request $request, SupportInbox $inbox, int $conversation): JsonResponse

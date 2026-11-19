@@ -4,12 +4,16 @@ use App\Http\Controllers\Admin\GeneralSettingsController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\NewPasswordController;
 use App\Http\Controllers\Auth\PasswordResetLinkController;
+use App\Http\Controllers\CustomerBillingController;
+use App\Http\Controllers\CustomerPlanController;
+use App\Http\Controllers\CustomerQueueController;
 use App\Http\Controllers\CustomerSupportController;
 use App\Http\Controllers\FrameController;
 use App\Http\Controllers\LocaleController;
 use App\Http\Controllers\MediaProjectController;
 use App\Http\Controllers\MediaToolsController;
 use App\Http\Controllers\OperationsController;
+use App\Http\Controllers\RecapStudioController;
 use App\Http\Middleware\EnsureCustomerAccess;
 use App\Http\Middleware\EnsurePlatformAvailable;
 use Illuminate\Support\Facades\Route;
@@ -35,6 +39,11 @@ Route::post('/locale', LocaleController::class)->middleware('throttle:locale-swi
 Route::middleware(['auth:web', EnsureCustomerAccess::class, 'auth.session', EnsurePlatformAvailable::class])->group(function (): void {
     Route::inertia('/', 'workspace')->name('workspace');
     Route::prefix('support-api')->name('support.')->group(function (): void {
+        Route::get('/chat', [CustomerSupportController::class, 'chat'])->name('chat');
+        Route::post('/chat/messages', [CustomerSupportController::class, 'sendChat'])->middleware('throttle:20,1')->name('chat.send');
+        Route::patch('/chat/messages/{message}', [CustomerSupportController::class, 'editChatMessage'])->whereNumber('message')->middleware('throttle:20,1')->name('chat.edit');
+        Route::delete('/chat/messages/{message}', [CustomerSupportController::class, 'deleteChatMessage'])->whereNumber('message')->middleware('throttle:20,1')->name('chat.delete');
+        Route::post('/chat/read', [CustomerSupportController::class, 'readChat'])->middleware('throttle:120,1')->name('chat.read');
         Route::get('/', [CustomerSupportController::class, 'index'])->name('index');
         Route::post('/', [CustomerSupportController::class, 'store'])->middleware('throttle:10,1')->name('store');
         Route::get('/{conversation}', [CustomerSupportController::class, 'show'])->whereNumber('conversation')->name('show');
@@ -42,12 +51,26 @@ Route::middleware(['auth:web', EnsureCustomerAccess::class, 'auth.session', Ensu
         Route::post('/{conversation}/read', [CustomerSupportController::class, 'read'])->whereNumber('conversation')->middleware('throttle:120,1')->name('read');
         Route::get('/{conversation}/attachments/{attachment}', [CustomerSupportController::class, 'attachment'])->whereNumber('conversation')->whereUuid('attachment')->name('attachment');
     });
+    Route::get('/account/billing', [CustomerBillingController::class, 'index'])->name('account.billing');
+    Route::prefix('account/billing-api')->name('account.billing.')->controller(CustomerBillingController::class)->group(function (): void {
+        Route::get('/options', 'options')->name('options');
+        Route::post('/', 'store')->middleware('throttle:10,1')->name('store');
+        Route::get('/methods/{method}/qr', 'methodQr')->whereNumber('method')->name('method-qr');
+        Route::get('/{payment}', 'show')->whereNumber('payment')->name('show');
+        Route::post('/{payment}', 'update')->whereNumber('payment')->middleware('throttle:10,1')->name('update');
+        Route::get('/{payment}/receipts/{receipt}', 'receipt')->whereNumber('payment')->whereUuid('receipt')->name('receipt');
+        Route::get('/{payment}/qr', 'paymentQr')->whereNumber('payment')->name('payment-qr');
+    });
+    Route::get('/account/plan', [CustomerPlanController::class, 'index'])->name('account.plan');
+    Route::get('/account/plan/exports/{run}', [CustomerPlanController::class, 'show'])->whereUuid('run')->name('account.plan.export');
     Route::get('/projects', [MediaProjectController::class, 'index'])->name('projects.index');
     Route::get('/projects/new', [MediaProjectController::class, 'create'])->name('projects.create');
     foreach (['setup' => 'projectSetup', 'script' => 'scriptReview', 'preview' => 'previewStudio', 'processing' => 'projectProcessing', 'result' => 'projectResult'] as $step => $frame) {
         Route::get('/projects/new/'.$step, [MediaProjectController::class, 'legacy'])->defaults('step', $step)->name('projects.step.'.$step);
     }
 
+    Route::get('/media/queue', CustomerQueueController::class)->middleware('throttle:120,1')->name('media.queue.feed');
+    Route::put('/media/name-dictionary', [RecapStudioController::class, 'dictionary'])->middleware('throttle:media-actions')->name('media.dictionary.save');
     Route::get('/media/presets', [MediaToolsController::class, 'presets'])->name('media.presets');
     Route::post('/media/presets', [MediaToolsController::class, 'savePreset'])->middleware('throttle:media-actions')->name('media.presets.save');
     Route::delete('/media/presets/{preset}', [MediaToolsController::class, 'deletePreset'])->whereNumber('preset')->middleware('throttle:media-actions')->name('media.presets.delete');
@@ -62,7 +85,7 @@ Route::middleware(['auth:web', EnsureCustomerAccess::class, 'auth.session', Ensu
         Route::post('/complete', [MediaProjectController::class, 'complete'])->name('media.complete');
         Route::patch('/', [MediaProjectController::class, 'update'])->name('media.update');
         Route::delete('/', [MediaProjectController::class, 'destroy'])->name('media.destroy');
-        Route::get('/files/{kind}', [MediaProjectController::class, 'file'])->whereIn('kind', ['source', 'poster', 'video', 'audio', 'subtitles'])->name('media.file');
+        Route::get('/files/{kind}', [MediaProjectController::class, 'file'])->whereIn('kind', ['source', 'poster', 'video', 'audio', 'subtitles', 'styledSubtitles'])->name('media.file');
         Route::post('/previews', [MediaToolsController::class, 'createPreview'])->middleware('throttle:media-previews')->name('media.preview.create');
         Route::get('/previews/{preview}', [MediaToolsController::class, 'preview'])->whereUuid('preview')->name('media.preview.status');
         Route::post('/previews/{preview}/cancel', [MediaToolsController::class, 'cancelPreview'])->whereUuid('preview')->middleware('throttle:media-actions')->name('media.preview.cancel');
@@ -75,6 +98,7 @@ Route::middleware(['auth:web', EnsureCustomerAccess::class, 'auth.session', Ensu
             Route::post('/generate', [MediaProjectController::class, 'generate'])->name('media.generate');
             Route::post('/retry', [MediaProjectController::class, 'retry'])->name('media.retry');
             Route::post('/cancel', [MediaProjectController::class, 'cancel'])->name('media.cancel');
+            Route::patch('/scenes', [RecapStudioController::class, 'scenes'])->name('media.scenes');
             Route::patch('/script', [MediaProjectController::class, 'script'])->name('media.script');
         });
     });

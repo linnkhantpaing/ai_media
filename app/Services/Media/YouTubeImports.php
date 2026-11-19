@@ -10,6 +10,7 @@ use App\Models\MediaTask;
 use App\Models\User;
 use App\Services\UsageLedger;
 use App\Support\MediaSettings;
+use App\Support\StudioTesting;
 use App\Support\YouTubeUrl;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -34,10 +35,10 @@ class YouTubeImports
             if (! app(YouTubeDownloader::class)->available()) {
                 throw new MediaFailure('youtube_tools_missing');
             }
-            $policy = app(StorageSettings::class)->policy();
+            $policy = app(StorageSettings::class)->limits();
             $assignment = User::findOrFail($userId)->currentPackageAssignment;
             $reserve = (int) $policy['max_bytes'];
-            if ($assignment) {
+            if ($assignment && ! StudioTesting::enabled()) {
                 $definition = $assignment->effectiveSnapshot()['definition'];
                 $reserve = min($reserve, (int) ($definition['max_upload_bytes'] ?? $reserve), max(0, (int) $definition['storage_bytes'] - app(UsageLedger::class)->allocatedStorage($userId)));
                 $policy['max_duration'] = min($policy['max_duration'], $definition['max_video_seconds']);
@@ -60,8 +61,8 @@ class YouTubeImports
                 'title' => trim((string) ($data['title'] ?? '')) ?: 'YouTube video',
                 'source_name' => 'YouTube video.mp4', 'source_extension' => 'mp4',
                 'source_path' => 'media/'.$id.'/source.mp4', 'source_type' => 'youtube', 'source_url' => $url,
-                'expected_bytes' => $reserve, 'uploaded_bytes' => 0, 'status' => 'importing', 'import_stage' => 'queued',
-                'settings' => MediaSettings::defaults(), 'lines' => [], 'storage_profile_id' => app(StorageSettings::class)->capture(), 'storage_policy' => $policy, 'storage_disk' => app(StorageSettings::class)->connection()['disk'],
+                'expected_bytes' => $reserve, 'uploaded_bytes' => 0, 'status' => 'importing', 'import_stage' => 'queued', 'source_progress' => 0,
+                'settings' => MediaSettings::defaults($userId), 'lines' => [], 'storage_profile_id' => app(StorageSettings::class)->capture(), 'storage_policy' => $policy, 'storage_disk' => app(StorageSettings::class)->connection()['disk'],
             ])->save();
             $disk->makeDirectory('media/'.$id.'/import');
 
@@ -88,7 +89,7 @@ class YouTubeImports
                 }
                 $maximum = (int) ($current->storage_policy ?? app(StorageSettings::class)->policy())['max_bytes'];
                 app(MediaStorage::class)->reserve(max(0, $maximum - $current->expected_bytes));
-                $current->forceFill(['expected_bytes' => $maximum, 'status' => 'importing', 'import_stage' => 'queued', 'import_cancel_requested' => false, 'error_code' => null])->save();
+                $current->forceFill(['expected_bytes' => $maximum, 'status' => 'importing', 'import_stage' => 'queued', 'source_progress' => 0, 'import_cancel_requested' => false, 'error_code' => null])->save();
                 ImportYouTubeVideo::dispatch($current->id)->afterCommit();
             });
         });

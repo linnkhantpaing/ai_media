@@ -40,6 +40,10 @@ class ProjectLibraryTest extends TestCase
             ->where('projects.total', 1)->where('counts.all', 5)->where('counts.draft', 1)
             ->where('counts.awaiting_review', 1)->where('counts.processing', 1)->where('counts.completed', 1)->where('counts.needs_attention', 1)
             ->where('filters.q', 'Story')->where('filters.source', 'youtube')->where('filters.mode', 'dub'));
+        if (getenv('PROJECT_LIBRARY_UI_CAPTURE')) {
+            $this->withVite();
+            file_put_contents(sys_get_temp_dir().'/project-library-qa.html', $this->get('/projects')->getContent());
+        }
     }
 
     public function test_search_matches_filenames_and_treats_sql_wildcards_literally(): void

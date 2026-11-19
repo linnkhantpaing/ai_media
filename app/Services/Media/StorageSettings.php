@@ -4,6 +4,7 @@ namespace App\Services\Media;
 
 use App\Models\MediaProject;
 use App\Services\AuditTrail;
+use App\Support\StudioTesting;
 use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
@@ -37,7 +38,7 @@ class StorageSettings
 
     public function limits(): array
     {
-        return $this->accepted ?? $this->policy();
+        return StudioTesting::policy($this->accepted ?? $this->policy());
     }
 
     public function withPolicy(?array $policy, callable $action): mixed

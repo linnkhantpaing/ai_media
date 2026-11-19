@@ -25,7 +25,7 @@ class SaveProjectDefaultsRequest extends UpdateMediaSettingsRequest
         unset($rules['title'], $rules['confirm_reanalysis']);
         $rules['revision'] = ['required', 'integer', 'min:0'];
         $rules['inherit_voice'] = ['required', 'boolean'];
-        $rules['settings'] = ['required', 'array:'.implode(',', array_keys(MediaSettings::DEFAULTS))];
+        $rules['settings'] = ['required', 'array:'.implode(',', MediaSettings::keys())];
         foreach (array_keys(MediaSettings::DEFAULTS) as $key) {
             $rules['settings.'.$key] = array_merge([$key === 'voice_style' ? 'present' : 'required'], array_values(array_filter(
                 $rules['settings.'.$key], fn ($rule): bool => ! in_array($rule, ['sometimes', 'required_with:settings'], true)

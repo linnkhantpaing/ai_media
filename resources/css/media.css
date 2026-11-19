@@ -267,3 +267,9 @@
 .media-select-trigger:disabled { cursor: not-allowed; }
 
 .processing-allowance-notice{display:flex;align-items:flex-start;gap:10px;border:1px solid color-mix(in srgb,var(--mint) 25%,var(--border));border-radius:11px;background:color-mix(in srgb,var(--mint) 5%,var(--surface));padding:12px 15px;margin:16px 0;color:var(--text-secondary);font-size:10px;line-height:1.8}.processing-allowance-notice>svg{height:16px;width:16px;flex-shrink:0;color:var(--mint);margin-top:2px}.processing-allowance-notice>div{display:grid;gap:3px}.processing-allowance-notice strong{color:var(--text);font-size:11px}
+
+/* Native top-layer menus escape scroll panels and modal overflow. */
+.media-select-options.media-select-floating {position:fixed;inset:auto;margin:0;z-index:10020;box-sizing:border-box;animation:media-select-reveal 140ms ease-out both;}
+.media-select-floating::backdrop {background:transparent;pointer-events:none;}
+@keyframes media-select-reveal {from{opacity:0;transform:translateY(-3px);}to{opacity:1;transform:none;}}
+@media(prefers-reduced-motion:reduce){.media-select-options.media-select-floating{animation:none;}}

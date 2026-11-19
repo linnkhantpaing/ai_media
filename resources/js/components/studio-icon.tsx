@@ -1,8 +1,19 @@
 import type { SVGProps } from 'react';
 
-export type IconName = 'reply' | 'smile' | 'chat' | 'paperclip' | 'archive' | 'filter' | 'bolt' | 'first-page' | 'last-page' | 'phone' | 'link' | 'gear' | 'globe' | 'image' | 'send' | 'wrench' | 'server' | 'cube' | 'folder-play' | 'triangle-play' | 'circle-x' | 'hourglass' | 'ban' | 'bank' | 'wallet' | 'star' | 'copy' | 'crown' | 'mail' | 'pause' | 'swap' | 'refresh' | 'users' | 'credit-card' | 'receipt' | 'chart' | 'home' | 'grid' | 'plus' | 'folder' | 'layers' | 'file' | 'clock' | 'loader' | 'check' | 'alert' | 'monitor' | 'jobs' | 'activity' | 'settings' | 'sliders' | 'key' | 'database' | 'chevrons' | 'chevron' | 'menu' | 'close' | 'search' | 'sun' | 'moon' | 'bell' | 'logout' | 'shield' | 'play' | 'download' | 'upload' | 'trash' | 'info' | 'arrow' | 'back' | 'mic' | 'captions' | 'sparkles' | 'edit' | 'eye' | 'more' | 'list' | 'calendar' | 'youtube' | 'headphones' | 'save';
+export type IconName = 'filter-clear' | 'volume' | 'volume-off' | 'eye-off' | 'move-up' | 'move-down' | 'scissors' | 'timeline' | 'undo' | 'redo' | 'reset' | 'reply' | 'smile' | 'chat' | 'paperclip' | 'archive' | 'filter' | 'bolt' | 'first-page' | 'last-page' | 'phone' | 'link' | 'gear' | 'globe' | 'image' | 'send' | 'wrench' | 'server' | 'cube' | 'folder-play' | 'triangle-play' | 'circle-x' | 'hourglass' | 'ban' | 'bank' | 'wallet' | 'star' | 'copy' | 'crown' | 'mail' | 'pause' | 'swap' | 'refresh' | 'users' | 'credit-card' | 'receipt' | 'chart' | 'home' | 'grid' | 'plus' | 'folder' | 'layers' | 'file' | 'clock' | 'loader' | 'check' | 'alert' | 'monitor' | 'jobs' | 'activity' | 'settings' | 'sliders' | 'key' | 'database' | 'chevrons' | 'chevron' | 'menu' | 'close' | 'search' | 'sun' | 'moon' | 'bell' | 'logout' | 'shield' | 'play' | 'download' | 'upload' | 'trash' | 'info' | 'arrow' | 'back' | 'mic' | 'captions' | 'sparkles' | 'edit' | 'eye' | 'more' | 'list' | 'calendar' | 'youtube' | 'headphones' | 'save';
 
 const paths: Record<IconName, React.ReactNode> = {
+ 'filter-clear': <><path d="M20 4H3l7 8v8l4-2v-6l2-2M17 15l5 5m0-5-5 5"/></>,
+ volume: <><path d="M11 4 6 8H3v8h3l5 4V4ZM15 8a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14"/></>,
+ 'volume-off': <><path d="M11 4 6 8H3v8h3l5 4V4Zm5 5 6 6m0-6-6 6"/></>,
+ 'eye-off': <><path d="m3 3 18 18M9.5 5.5C15 3 20 8 22 12a20 20 0 0 1-4 5M6 6C4 8 3 10 2 12c4 7 10 9 16 5M10 10a3 3 0 0 0 4 4"/></>,
+ 'move-up':<path d="M12 20V4m-6 6 6-6 6 6"/>,
+ 'move-down':<path d="M12 4v16m-6-6 6 6 6-6"/>,
+ scissors:<><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="m8 8 13 13M8 16 21 3"/></>,
+ timeline:<><path d="M3 4v17h18M7 3v4m5-4v4m5-4v4M7 10h11v3H7zM7 16h7v3H7z"/></>,
+ undo:<path d="m9 4-5 5 5 5M4 9h9a7 7 0 0 1 7 7v3"/>,
+ redo:<path d="m15 4 5 5-5 5m5-5h-9a7 7 0 0 0-7 7v3"/>,
+ reset:<><path d="M3 4v6h6"/><path d="M3.5 10a9 9 0 1 1 2 8"/></>,
  reply: <path d="m9 4-5 5 5 5M4 9h10a6 6 0 0 1 6 6v5"/>,
  smile: <><circle cx="12" cy="12" r="9"/><path d="M7.5 14a5 5 0 0 0 9 0"/><circle cx="8.5" cy="9" r=".8" fill="currentColor" stroke="none"/><circle cx="15.5" cy="9" r=".8" fill="currentColor" stroke="none"/></>,
  chat: <><path d="M20 11a8 8 0 0 1-8 8H7l-4 3V11a8 8 0 0 1 17 0Z"/><path d="M7 10h.01M12 10h.01M17 10h.01M7 14h7"/></>,
@@ -85,7 +96,7 @@ const paths: Record<IconName, React.ReactNode> = {
     more: <><circle cx="4" cy="12" r="1" fill="currentColor" /><circle cx="12" cy="12" r="1" fill="currentColor" /><circle cx="20" cy="12" r="1" fill="currentColor" /></>,
     list: <><path d="M9 6h12M9 12h12M9 18h12M3 6h1M3 12h1M3 18h1" /></>,
     calendar: <><rect x="3" y="5" width="18" height="16" rx="3" /><path d="M7 3v4M17 3v4M3 10h18M7 14h2m4 0h2M7 17h2" /></>,
-    youtube: <><rect x="2" y="5" width="20" height="14" rx="5" fill="currentColor" stroke="none" /><path d="m10 9 5 3-5 3Z" fill="var(--white)" stroke="none" /></>,
+    youtube: <><rect x="2" y="5" width="20" height="14" rx="5" fill="#FF0000" stroke="none" /><path d="m10 9 5 3-5 3Z" fill="#FFFFFF" stroke="none" /></>,
     download: <><path d="M12 3v12m-4-4 4 4 4-4M4 16v5h16v-5" /></>,
 };
 export function StudioIcon({ name, ...props }: SVGProps<SVGSVGElement> & { name: IconName }) {

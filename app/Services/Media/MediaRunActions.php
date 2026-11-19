@@ -33,6 +33,7 @@ class MediaRunActions
             app(UsageLedger::class)->reserve($run);
             $artifacts = $run->artifacts ?? [];
             $artifacts['processing_attempts_'.$run->phase] = 0;
+            unset($artifacts['analysis_failure_checkpoint'], $artifacts['analysis_failures_without_progress']);
             $run->forceFill(['artifacts' => $artifacts])->save();
             $run->forceFill(['status' => 'queued', 'cancel_requested' => false, 'error_code' => null, 'finished_at' => null])->save();
             $project->forceFill(['status' => 'queued', 'error_code' => null])->save();

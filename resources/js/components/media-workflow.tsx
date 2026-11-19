@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { Head, Link } from '@inertiajs/react';
 import { StudioIcon, type IconName } from '@/components/studio-icon';
 import {useCreatorText} from '@/lib/media-creator-i18n';
@@ -24,7 +24,7 @@ export function MediaSummary({ project, children }: { project: MediaProject; chi
     const { t } = useMediaText(); const [preview, setPreview] = useState(false);
     return <><div className="media-summary"><button type="button" className="media-thumbnail" aria-label={t('source')} onClick={() => setPreview(true)} disabled={!project.metadata?.audio}>{project.metadata?.poster ? <img src={project.links.poster} alt="" /> : <StudioIcon name="play" />}<span className="media-play"><StudioIcon name="play" /></span>{project.metadata && <time>{formatTime(project.metadata.duration)}</time>}</button><div className="media-summary-info"><h2 title={project.filename}>{project.filename}</h2><div className="media-metadata"><span>{formatBytes(project.bytes)}</span>{project.metadata && <><span>{project.metadata.width} × {project.metadata.height}</span><span>{project.metadata.aspect}</span></>}</div>{project.metadata?.audio && <span className="media-badge"><StudioIcon name="check" />{t('videoVerified')}</span>}</div>{children}</div><MediaDialog open={preview} title={project.title} onClose={() => setPreview(false)}><video className="media-preview-video" controls playsInline preload="metadata" src={preview ? project.links.source : undefined} poster={project.metadata?.poster ? project.links.poster : undefined} /></MediaDialog></>;
 }
-export function MediaDialog({ open, title, onClose, children, className = '', headerIcon, headerDetail, animated = false }: { open: boolean; title: string; onClose: () => void; children: ReactNode; className?: string; headerIcon?: IconName; headerDetail?: ReactNode; animated?: boolean }) {
+export function MediaDialog({ open, title, onClose, children, className = '', headerIcon, headerDetail, animated = false, descriptionId }: { open: boolean; title: string; onClose: () => void; children: ReactNode; className?: string; headerIcon?: IconName; headerDetail?: ReactNode; animated?: boolean; descriptionId?: string }) {
     const ref = useRef<HTMLDialogElement>(null); const id = useId(); const { t } = useMediaText();
     const [present, setPresent] = useState(open);
     const [motion, setMotion] = useState('closed');
@@ -60,18 +60,74 @@ export function MediaDialog({ open, title, onClose, children, className = '', he
             clearTimeout(closeTimer);
         };
     }, [open, animated]);
-    return <dialog className={'media-dialog ' + className} ref={ref} data-state={animated ? motion : undefined} aria-labelledby={id} onKeyDown={(event) => { if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); onClose(); } }} onCancel={(event) => { event.preventDefault(); onClose(); }} onClose={() => { if (open && !ref.current?.open) onClose(); }} onClick={(event) => { if (event.target === event.currentTarget) onClose(); }}><div className="media-dialog-inner"><header>{headerIcon && <span className="media-dialog-header-icon" aria-hidden="true"><StudioIcon name={headerIcon} /></span>}{headerIcon || headerDetail ? <div className="media-dialog-heading"><h2 id={id}>{title}</h2>{headerDetail && <div className="media-dialog-header-detail">{headerDetail}</div>}</div> : <h2 id={id}>{title}</h2>}<button type="button" className="icon-button" onClick={onClose} aria-label={t('close')}><StudioIcon name="close" /></button></header>{(animated ? present : open) && children}</div></dialog>;
+    return <dialog className={'media-dialog ' + className} ref={ref} data-state={animated ? motion : undefined} aria-labelledby={id} aria-describedby={descriptionId} onKeyDown={(event) => { if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); onClose(); } }} onCancel={(event) => { event.preventDefault(); onClose(); }} onClose={() => { if (open && !ref.current?.open) onClose(); }} onClick={(event) => { if (event.target === event.currentTarget) onClose(); }}><div className="media-dialog-inner"><header>{headerIcon && <span className="media-dialog-header-icon" aria-hidden="true"><StudioIcon name={headerIcon} /></span>}{headerIcon || headerDetail ? <div className="media-dialog-heading"><h2 id={id}>{title}</h2>{headerDetail && <div className="media-dialog-header-detail">{headerDetail}</div>}</div> : <h2 id={id}>{title}</h2>}<button type="button" className="icon-button" onClick={onClose} aria-label={t('close')}><StudioIcon name="close" /></button></header>{(animated ? present : open) && children}</div></dialog>;
 }
 export function ConfirmDialog({ open, message, onConfirm, onClose, busy = false }: { open: boolean; message: string; onConfirm: () => void; onClose: () => void; busy?: boolean }) {
     const { t } = useMediaText();
     return <MediaDialog open={open} title={t('confirm')} onClose={() => { if (!busy) onClose(); }}><p>{message}</p><div className="media-actions"><button type="button" className="media-button" onClick={onClose} disabled={busy}>{t('cancel')}</button><button type="button" className="media-button primary" onClick={onConfirm} disabled={busy}>{t(busy ? 'saving' : 'confirm')}</button></div></MediaDialog>;
 }
 export function SelectField({ value, options, onChange, label, disabled = false, required = false, invalid = false }: { value: string; options: { value: string; label: string; detail?: string; image?: string }[]; onChange: (value: string) => void; label: string; disabled?: boolean; required?: boolean; invalid?: boolean }) {
-    const [open, setOpen] = useState(false); const [active, setActive] = useState(0); const root = useRef<HTMLDivElement>(null); const trigger = useRef<HTMLButtonElement>(null); const id = useId(); const selected = options.find((option) => option.value === value);
-    useEffect(() => { if (!open) return; const close = (event: PointerEvent) => { if (!root.current?.contains(event.target as Node)) setOpen(false); }; document.addEventListener('pointerdown', close); return () => document.removeEventListener('pointerdown', close); }, [open]);
-    useEffect(() => { if (open) document.getElementById(id + '-' + active)?.scrollIntoView({ block: 'nearest' }); }, [open, active, id]);
-    const choose = (next: string) => { onChange(next); setOpen(false); trigger.current?.focus(); };
-    return <div className="media-select" ref={root} onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false); }}><button ref={trigger} type="button" className="media-select-trigger" disabled={disabled} role="combobox" aria-required={required || undefined} aria-invalid={invalid || undefined} aria-label={label} aria-haspopup="listbox" aria-expanded={open} aria-controls={id} aria-activedescendant={open ? id + '-' + active : undefined} onClick={() => { setActive(Math.max(0, options.findIndex((option) => option.value === value))); setOpen(!open); }} onKeyDown={(event) => { if (['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) { event.preventDefault(); if (!open) { setOpen(true); setActive(Math.max(0, options.findIndex((option) => option.value === value))); } else setActive(event.key === 'Home' ? 0 : event.key === 'End' ? options.length - 1 : (active + (event.key === 'ArrowDown' ? 1 : -1) + options.length) % options.length); } else if (event.key === 'Escape') { event.preventDefault(); setOpen(false); } else if ((event.key === 'Enter' || event.key === ' ') && open) { event.preventDefault(); choose(options[active].value); } }}><span className={selected?.image?'media-option-image-label':undefined}>{selected?.image&&<img src={selected.image} alt="" width={22} height={16}/>}<strong>{selected?.label || label}</strong>{selected?.detail && <small>{selected.detail}</small>}</span><StudioIcon name="chevron" /></button>{open && <div id={id} role="listbox" aria-label={label} className="media-select-options">{options.map((option, index) => <button key={option.value} type="button" tabIndex={-1} role="option" id={id + '-' + index} aria-selected={value === option.value} className={active === index ? 'is-focused' : ''} onPointerMove={() => setActive(index)} onMouseDown={(event) => event.preventDefault()} onClick={() => choose(option.value)}><span className={option.image?'media-option-image-label':undefined}>{option.image&&<img src={option.image} alt="" width={22} height={16}/>}<span>{option.label}</span>{option.detail && <small>{option.detail}</small>}</span>{value === option.value && <StudioIcon name="check" />}</button>)}</div>}</div>;
+    const [open, setOpen] = useState(false), [active, setActive] = useState(0);
+    const root = useRef<HTMLDivElement>(null), trigger = useRef<HTMLButtonElement>(null), menu = useRef<HTMLDivElement>(null);
+    const id = useId(), selected = options.find(option => option.value === value);
+    useLayoutEffect(() => {
+        if (!open || !menu.current || !trigger.current) return;
+        const element = menu.current, anchor = trigger.current;
+        const position = () => {
+            const rect = anchor.getBoundingClientRect();
+            const viewport = window.visualViewport;
+            const left = viewport?.offsetLeft ?? 0, top = viewport?.offsetTop ?? 0;
+            const width = viewport?.width ?? innerWidth, height = viewport?.height ?? innerHeight;
+            if (!anchor.isConnected || rect.bottom < top || rect.top > top + height) { setOpen(false); return; }
+            for(let parent = anchor.parentElement; parent && parent !== document.body; parent = parent.parentElement) {
+                if (/(auto|scroll|hidden|clip)/.test(getComputedStyle(parent).overflowY)) {
+                    const clip = parent.getBoundingClientRect();
+                    if (rect.bottom <= clip.top || rect.top >= clip.bottom) { setOpen(false); return; }
+                }
+            }
+            const below = Math.max(0, top + height - rect.bottom - 14), above = Math.max(0, rect.top - top - 14);
+            const upwards = below < 220 && above > below;
+            const available = Math.min(300, upwards ? above : below);
+            Object.assign(element.style, {width:Math.min(rect.width,width-16)+'px',maxHeight:available+'px',left:Math.max(left+8,Math.min(rect.left,left+width-rect.width-8))+'px',top:'0px'});
+            const actual = Math.min(element.scrollHeight,available);
+            element.style.top = (upwards ? rect.top - actual - 6 : rect.bottom + 6)+'px';
+        };
+        position();
+        element.showPopover?.();
+        position();
+        const outside = (event: PointerEvent) => { if (!root.current?.contains(event.target as Node)) setOpen(false); };
+        const scroll = (event: Event) => { if (!element.contains(event.target as Node)) position(); };
+        const observer = new ResizeObserver(position); observer.observe(anchor);
+        document.addEventListener('pointerdown',outside,true);
+        window.addEventListener('scroll',scroll,true);window.addEventListener('resize',position);
+        window.visualViewport?.addEventListener('resize',position);window.visualViewport?.addEventListener('scroll',position);
+        return () => {
+            observer.disconnect();document.removeEventListener('pointerdown',outside,true);
+            window.removeEventListener('scroll',scroll,true);window.removeEventListener('resize',position);
+            window.visualViewport?.removeEventListener('resize',position);window.visualViewport?.removeEventListener('scroll',position);
+            if(element.matches(':popover-open'))element.hidePopover();
+        };
+    },[open,options.length]);
+    useLayoutEffect(() => {
+        if (!open || !menu.current) return;
+        const option = document.getElementById(id+'-'+active), list = menu.current;
+        if (!option) return;
+        if(option.offsetTop < list.scrollTop)list.scrollTop=option.offsetTop;
+        else if(option.offsetTop+option.offsetHeight > list.scrollTop+list.clientHeight)list.scrollTop=option.offsetTop+option.offsetHeight-list.clientHeight;
+    },[open,active,id]);
+    useEffect(()=>{if(disabled)setOpen(false);},[disabled]);
+    const choose = (next: string) => { onChange(next);setOpen(false);trigger.current?.focus({preventScroll:true}); };
+    return <div className="media-select" ref={root} onBlur={event=>{if(!event.currentTarget.contains(event.relatedTarget))setOpen(false);}}>
+        <button ref={trigger} type="button" className="media-select-trigger" disabled={disabled} role="combobox" aria-required={required||undefined} aria-invalid={invalid||undefined} aria-label={label} aria-haspopup="listbox" aria-expanded={open} aria-controls={id} aria-activedescendant={open?id+'-'+active:undefined} onClick={()=>{setActive(Math.max(0,options.findIndex(option=>option.value===value)));setOpen(!open);}} onKeyDown={event=>{
+            if(['ArrowDown','ArrowUp','Home','End'].includes(event.key)){
+                event.preventDefault();
+                if(!open){setOpen(true);setActive(Math.max(0,options.findIndex(option=>option.value===value)));}
+                else if(options.length)setActive(event.key==='Home'?0:event.key==='End'?options.length-1:(active+(event.key==='ArrowDown'?1:-1)+options.length)%options.length);
+            }else if(event.key==='Escape'&&open){event.preventDefault();event.stopPropagation();setOpen(false);}
+            else if((event.key==='Enter'||event.key===' ')&&open){event.preventDefault();if(options[active])choose(options[active].value);}
+        }}><span className={selected?.image?'media-option-image-label':undefined}>{selected?.image&&<img src={selected.image} alt="" width={22} height={16}/>}<strong>{selected?.label||label}</strong>{selected?.detail&&<small>{selected.detail}</small>}</span><StudioIcon name="chevron"/></button>
+        {open&&<div ref={menu} id={id} role="listbox" aria-label={label} popover="manual" className="media-select-options media-select-floating">{options.map((option,index)=><button key={option.value} type="button" tabIndex={-1} role="option" id={id+'-'+index} aria-selected={value===option.value} className={active===index?'is-focused':''} onPointerMove={()=>setActive(index)} onMouseDown={event=>event.preventDefault()} onClick={()=>choose(option.value)}><span className={option.image?'media-option-image-label':undefined}>{option.image&&<img src={option.image} alt="" width={22} height={16}/>}<span>{option.label}</span>{option.detail&&<small>{option.detail}</small>}</span>{value===option.value&&<StudioIcon name="check"/>}</button>)}</div>}
+    </div>;
 }
 export function Choice({ selected, onClick, icon, title, hint, disabled = false, className = '' }: { selected: boolean; onClick: () => void; icon: IconName; title: string; hint?: string; disabled?: boolean; className?: string }) {
     return <button type="button" className={'media-choice ' + className + (selected ? ' is-selected' : '')} aria-pressed={selected} onClick={onClick} disabled={disabled}><span className="media-choice-icon"><StudioIcon name={icon} /></span><span><strong>{title}</strong>{hint && <small>{hint}</small>}</span></button>;

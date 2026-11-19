@@ -48,7 +48,8 @@ class PrepareMediaPreview implements ShouldBeUnique, ShouldQueue
             $service->process($preview);
         } catch (MediaFailure $failure) {
             if ($failure->retryable && $this->job && $this->attempts() < $this->tries && ! $preview->fresh()->cancel_requested) {
-                $preview->update(['status' => 'queued', 'error_code' => $failure->reason]);
+                $preview->refresh();
+                $preview->update(['status' => 'queued', 'error_code' => $failure->reason, 'result' => [...($preview->result ?? []), 'retryAt' => now()->addSeconds($failure->retryAfter ?? 30)->toIso8601String()]]);
                 $this->release($failure->retryAfter ?? 30);
 
                 return;

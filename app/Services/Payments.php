@@ -246,6 +246,50 @@ class Payments
         });
     }
 
+    public function submitCustomer(User $actor, array $data, ?int $id = null): array
+    {
+        if ($id !== null) {
+            PaymentTransaction::where('user_id', $actor->id)->findOrFail($id);
+        }
+        $data['user_id'] = $actor->id;
+        $data['action'] = $id === null ? 'created' : 'edit';
+
+        return $this->execute($actor, $id, $data, function (?PaymentTransaction $payment, User $user, array $data, ?UploadedFile $file, array &$paths) use ($actor): array {
+            $payment ??= new PaymentTransaction;
+            abort_unless(! $payment->exists || $payment->user_id === $actor->id, 404);
+            $this->require(! $payment->exists || (in_array($this->status($payment), ['awaiting_payment', 'pending_review', 'needs_information'], true) && $payment->subscription_id === null), 'payment', 'This payment is being reviewed or has already been resolved. Refresh its details.');
+            $this->require(! PaymentTransaction::where('user_id', $actor->id)->when($payment->exists, fn ($q) => $q->whereKeyNot($payment->id))->where(function ($q): void {
+                $q->whereIn('status', ['pending_review', 'under_review', 'needs_information'])->orWhere(fn ($r) => $r->where('status', 'awaiting_payment')->where('expires_at', '>', now()));
+            })->exists(), 'payment', 'You already have a payment awaiting action. Open its details instead.');
+            $existing = $payment->exists;
+            $before = $existing ? $this->status($payment) : null;
+            $context = $this->recordingContext($user);
+            $purposes = $this->recordingPurposes($context, (int) $data['package_id'], (int) $data['package_version']);
+            $this->require(count($purposes) > 0, 'package_id', 'A next subscription is already scheduled. Contact support before making another payment.');
+            $data['purpose'] = $existing ? $payment->purpose : $purposes[0];
+            $data['internal_note'] = $payment->internal_note ?? '';
+            $oldCurrency = $payment->currency;
+            $this->configureRecord($payment, $user, $data);
+            $this->require(! $existing || $oldCurrency === $payment->currency || $file !== null, 'receipt', 'Upload a receipt in the selected currency.');
+            $this->require($file !== null || ($existing && $payment->receipts()->whereNull('payment_refund_id')->where('is_current', true)->exists()), 'receipt', 'Upload your transfer receipt.');
+            $this->evidence($payment, $data, $file);
+            $payment->status = 'pending_review';
+            $payment->submitted_at = now();
+            $payment->reviewed_by = null;
+            if ($existing) {
+                $payment->revision++;
+            } else {
+                $payment->created_by = $actor->id;
+            }
+            $payment->save();
+            if ($file !== null) {
+                $this->storeReceipt($actor, $payment, $file, $paths);
+            }
+
+            return ['payment' => $payment, 'metadata' => ['before' => $before, 'status' => 'pending_review', 'entry' => 'received', 'source' => 'customer', 'reason' => $existing ? 'Customer updated transfer information.' : 'Customer submitted payment.']];
+        });
+    }
+
     private function configureRecord(PaymentTransaction $p, User $user, array $data): void
     {
         $this->require(! $user->is_admin && $user->account_status === 'active', 'user_id', 'Choose an active customer account.');

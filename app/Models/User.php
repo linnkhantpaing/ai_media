@@ -12,7 +12,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
 #[Fillable(['name', 'email', 'password', 'preferred_locale'])]
-#[Hidden(['password', 'remember_token', 'account_creation_key', 'account_creation_fingerprint'])]
+#[Hidden(['password', 'remember_token', 'account_creation_key', 'account_creation_fingerprint', 'recap_name_dictionary'])]
 class User extends Authenticatable
 {
     protected $attributes = ['account_status' => 'active', 'managed_account' => false, 'account_revision' => 1, 'auth_version' => 0];
@@ -40,6 +40,7 @@ class User extends Authenticatable
             'last_login_at' => 'datetime',
             'account_revision' => 'integer',
             'auth_version' => 'integer',
+            'recap_name_dictionary' => 'array',
         ];
     }
 }

@@ -18,6 +18,7 @@ export async function mediaApi<T>(url: string, method = 'GET', body?: unknown, s
     }
     const data = await response.json().catch(() => ({}));
     if (!response.ok) throw new MediaApiError(data.code || ([401, 419].includes(response.status) ? 'session_expired' : response.status === 429 ? 'rate_limited' : response.status === 422 ? 'validation_failed' : 'processing_failed'), data.errors || {}, response.status, data.offset);
+    if (method !== 'GET' && method !== 'PUT' && url.startsWith('/media/')) window.dispatchEvent(new Event('media-queue-changed'));
     return data as T;
 }
 export function failureCode(error: unknown) { return error instanceof MediaApiError ? error.code : 'network_error'; }
