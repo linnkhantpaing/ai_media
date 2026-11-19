@@ -21,6 +21,9 @@ class CustomerProfile
 {
     public const DATE_FORMATS = ['medium', 'dmy', 'mdy', 'iso'];
 
+    /** Time zones customers can choose: Myanmar, Thailand, Japan and Korea. */
+    public const TIMEZONES = ['Asia/Yangon', 'Asia/Bangkok', 'Asia/Tokyo', 'Asia/Seoul'];
+
     public const TIME_FORMATS = ['12', '24'];
 
     public function __construct(private StorageSettings $storage, private GeneralSettings $general) {}
@@ -40,7 +43,7 @@ class CustomerProfile
             'platform_display' => ['timezone' => $platform['timezone'] ?? 'UTC', 'date_format' => $platform['date_format'] ?? 'medium', 'time_format' => $platform['time_format'] ?? '24'],
             'devices' => $this->devices($user, $currentSession),
             'photo_storage_ready' => $this->cloudReady(),
-            'timezones' => \DateTimeZone::listIdentifiers(),
+            'timezones' => self::TIMEZONES,
         ];
     }
 
@@ -53,7 +56,9 @@ class CustomerProfile
     {
         $saved = $user->display_preferences ?? [];
 
-        return ['timezone' => $saved['timezone'] ?? null, 'date_format' => $saved['date_format'] ?? null, 'time_format' => $saved['time_format'] ?? null];
+        $timezone = in_array($saved['timezone'] ?? null, self::TIMEZONES, true) ? $saved['timezone'] : null;
+
+        return ['timezone' => $timezone, 'date_format' => $saved['date_format'] ?? null, 'time_format' => $saved['time_format'] ?? null];
     }
 
     /**
@@ -74,7 +79,7 @@ class CustomerProfile
             'profile' => ['required', 'array'],
             'profile.name' => ['required', 'string', 'max:100'],
             'profile.display' => ['required', 'array'],
-            'profile.display.timezone' => ['present', 'nullable', 'string', 'in:'.implode(',', \DateTimeZone::listIdentifiers())],
+            'profile.display.timezone' => ['present', 'nullable', 'string', 'in:'.implode(',', self::TIMEZONES)],
             'profile.display.date_format' => ['present', 'nullable', 'in:'.implode(',', self::DATE_FORMATS)],
             'profile.display.time_format' => ['present', 'nullable', 'in:'.implode(',', self::TIME_FORMATS)],
         ];

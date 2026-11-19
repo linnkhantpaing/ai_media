@@ -367,20 +367,6 @@
 .pref-preview small{color:var(--text-muted);font-size:9px;text-transform:uppercase;letter-spacing:.4px}
 .pref-preview strong{font-size:14px}
 .pref-preview span{color:var(--text-secondary);font-size:10px}
-.pref-picker{position:relative}
-.pref-picker-trigger{display:flex;align-items:center;gap:8px;width:100%;min-height:35px;padding:6px 10px;border:0;border-radius:9px;background:color-mix(in srgb,var(--surface) 70%,transparent);color:var(--text);font-size:11px;font-weight:550;text-align:start;cursor:pointer;box-shadow:var(--pref-raise-sm)}
-.pref-picker-trigger>span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.pref-picker-trigger svg{width:14px;height:14px;color:var(--text-muted)}
-.pref-picker-trigger[aria-expanded=true]{box-shadow:0 0 0 1.5px var(--primary)}
-.pref-picker-panel{position:absolute;z-index:40;top:calc(100% + 6px);left:0;right:0;padding:8px;border-radius:12px;background:var(--surface-elevated);box-shadow:0 18px 40px #000b,inset 0 1px 0 #ffffff10;animation:pref-menu-in .14s ease-out}
-.pref-picker-panel .pref-search{width:100%;margin-bottom:6px}
-.pref-picker-list{max-height:240px;overflow-y:auto;scrollbar-width:none;display:flex;flex-direction:column}
-.pref-picker-list::-webkit-scrollbar{display:none}
-.pref-picker-list button{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 9px;border:0;border-radius:7px;background:none;color:var(--text);font-size:11px;text-align:start;cursor:pointer}
-.pref-picker-list button[data-active=true]{background:color-mix(in srgb,var(--primary) 14%,transparent)}
-.pref-picker-list button[aria-selected=true]{color:var(--primary);font-weight:700}
-.pref-picker-list button svg{width:13px;height:13px}
-.pref-picker-list p{padding:8px;margin:0}
 .pref-devices{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:7px}
 .pref-devices li{display:grid;grid-template-columns:34px minmax(0,1fr) auto;align-items:center;gap:12px;padding:9px 10px;border-radius:11px;background:color-mix(in srgb,var(--background) 35%,transparent)}
 .pref-devices li.is-current{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--mint) 35%,transparent)}
@@ -417,3 +403,16 @@
  .pref-row-line>.pref-button{grid-column:1/-1;justify-self:stretch}
  .pref-rules{grid-template-columns:1fr}
 }
+
+/* Time zone choices: platform default + Myanmar, Thailand, Japan, Korea */
+.pref-zone-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:7px}
+.pref-zone-grid button{display:flex;flex-direction:column;align-items:stretch;gap:2px;padding:9px 10px;border:0;border-radius:10px;background:color-mix(in srgb,var(--surface) 70%,transparent);color:var(--text);text-align:start;cursor:pointer;box-shadow:var(--pref-raise-sm);transition:background .15s,box-shadow .15s}
+.pref-zone-grid button:hover:not(.selected){background:color-mix(in srgb,var(--primary) 10%,var(--surface))}
+.pref-zone-grid button.selected{box-shadow:0 0 0 1.5px var(--primary),0 6px 14px color-mix(in srgb,var(--primary) 22%,transparent);background:color-mix(in srgb,var(--primary) 12%,var(--surface))}
+.pref-zone-head{display:flex;align-items:center;justify-content:space-between;gap:6px}
+.pref-zone-head strong{font-size:11px;font-weight:700}
+.pref-zone-head svg{width:13px;height:13px;color:var(--primary)}
+.pref-zone-grid small{color:var(--text-muted);font-size:9px}
+.pref-zone-time{display:flex;flex-direction:column;gap:0;margin-top:3px}
+.pref-zone-time b{font-size:13px;font-weight:800;letter-spacing:-.2px}
+.pref-zone-time em{font-style:normal;color:var(--text-secondary);font-size:9px}

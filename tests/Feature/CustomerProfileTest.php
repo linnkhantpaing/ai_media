@@ -53,6 +53,20 @@ class CustomerProfileTest extends TestCase
         $this->assertDatabaseHas('customer_account_events', ['user_id' => $this->customer->id, 'type' => 'self_profile_updated']);
     }
 
+    public function test_only_myanmar_thailand_japan_and_korea_time_zones_are_offered_and_applied(): void
+    {
+        $this->actingAs($this->customer)->get('/settings/preferences')
+            ->assertInertia(fn (Assert $page) => $page->where('preferences.profile.timezones', ['Asia/Yangon', 'Asia/Bangkok', 'Asia/Tokyo', 'Asia/Seoul']));
+        $this->putJson('/settings/preferences', $this->payload(['display' => ['timezone' => 'Africa/Accra']]))->assertUnprocessable()->assertJsonValidationErrors('profile.display.timezone');
+        foreach (['Asia/Bangkok', 'Asia/Tokyo', 'Asia/Seoul', 'Asia/Yangon'] as $zone) {
+            $this->putJson('/settings/preferences', $this->payload(['display' => ['timezone' => $zone]]))->assertOk();
+            $this->get('/projects')->assertInertia(fn (Assert $page) => $page->where('app.timezone', $zone));
+        }
+        $this->customer->forceFill(['display_preferences' => ['timezone' => 'Africa/Accra', 'time_format' => '12']])->save();
+        $this->get('/projects')->assertInertia(fn (Assert $page) => $page->where('app.timezone', 'Asia/Bangkok')->where('app.time_format', '12'));
+        $this->get('/settings/preferences')->assertInertia(fn (Assert $page) => $page->where('preferences.profile.display.timezone', null));
+    }
+
     public function test_email_change_requires_the_current_password_and_a_free_address(): void
     {
         User::factory()->create(['email' => 'taken@example.test']);

@@ -247,6 +247,14 @@ const words={
  languageInHeader:["Change the interface language from the flag in the header.","UI ဘာသာစကားကို Header ရှိ အလံမှ ပြောင်းနိုင်သည်။","เปลี่ยนภาษาของอินเทอร์เฟซได้จากธงที่ส่วนหัว"],
  showAllDevices:["Show all devices","Device အားလုံး ကြည့်ရန်","แสดงอุปกรณ์ทั้งหมด"],
  showFewer:["Show fewer","လျှော့ပြရန်","แสดงน้อยลง"],
+ zoneMyanmar:["Myanmar","မြန်မာ","เมียนมา"],
+ cityYangon:["Yangon","ရန်ကုန်","ย่างกุ้ง"],
+ zoneThailand:["Thailand","ထိုင်း","ไทย"],
+ cityBangkok:["Bangkok","ဘန်ကောက်","กรุงเทพฯ"],
+ zoneJapan:["Japan","ဂျပန်","ญี่ปุ่น"],
+ cityTokyo:["Tokyo","တိုကျို","โตเกียว"],
+ zoneKorea:["South Korea","တောင်ကိုရီးယား","เกาหลีใต้"],
+ citySeoul:["Seoul","ဆိုးလ်","โซล"],
 } as const;
 export type PreferenceWord=keyof typeof words;
 

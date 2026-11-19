@@ -198,7 +198,7 @@ function DisplayCard({data,display,onDisplay,errors,t}:{data:PreferencesData;dis
  const example=(format:string)=>formatPlatformDate(now,locale,{...effective,date_format:format},false);
  return <section className="pref-card pref-account-card"><h2><StudioIcon name="clock"/>{t('dateTime')}</h2>
   <p className="pref-card-intro">{t('displayHint')}</p>
-  <div className="pref-text-field"><span>{t('timezone')}</span><TimezonePicker value={display.timezone} platform={platform.timezone} zones={data.profile.timezones} onChange={timezone=>onDisplay({...display,timezone})} t={t}/>{errors['profile.display.timezone']?.map((message,index)=><small key={index} className="pref-error">{message}</small>)}</div>
+  <div className="pref-text-field"><span>{t('timezone')}</span><ZoneChoices value={display.timezone} platform={platform.timezone} zones={data.profile.timezones} now={now} onChange={timezone=>onDisplay({...display,timezone})} t={t}/>{errors['profile.display.timezone']?.map((message,index)=><small key={index} className="pref-error">{message}</small>)}</div>
   <div className="pref-text-field"><span>{t('dateFormat')}</span><div className="pref-format-grid" role="radiogroup" aria-label={t('dateFormat')}>
    <button type="button" role="radio" aria-checked={display.date_format===null} className={display.date_format===null?'selected':''} onClick={()=>onDisplay({...display,date_format:null})}><strong>{t('platformDefault')}</strong><small>{example(platform.date_format)}</small></button>
    {dateFormats.map(format=><button key={format} type="button" role="radio" aria-checked={display.date_format===format} className={display.date_format===format?'selected':''} onClick={()=>onDisplay({...display,date_format:format})}><strong>{example(format)}</strong><small>{format==='medium'?'Medium':format==='dmy'?'DD/MM/YYYY':format==='mdy'?'MM/DD/YYYY':'YYYY-MM-DD'}</small></button>)}
@@ -206,27 +206,25 @@ function DisplayCard({data,display,onDisplay,errors,t}:{data:PreferencesData;dis
   <div className="pref-text-field"><span>{t('timeFormat')}</span><div className="pref-segment" role="radiogroup" aria-label={t('timeFormat')}>
    {([null,'12','24'] as const).map(format=><button key={String(format)} type="button" role="radio" aria-checked={display.time_format===format} className={display.time_format===format?'selected':''} onClick={()=>onDisplay({...display,time_format:format})}>{format===null?t('platformDefault'):format==='12'?t('hour12'):t('hour24')}</button>)}
   </div></div>
-  <div className="pref-preview"><small>{t('preview')}</small><strong>{formatPlatformDate(now,locale,effective,true)}</strong><span>{effective.timezone}</span></div>
+  <div className="pref-preview"><small>{t('preview')}</small><strong>{formatPlatformDate(now,locale,effective,true)}</strong><span>{zoneName(effective.timezone,t)}</span></div>
  </section>;
 }
 
-function TimezonePicker({value,platform,zones,onChange,t}:{value:string|null;platform:string;zones:string[];onChange:(value:string|null)=>void;t:Text}){
- const [open,setOpen]=useState(false),[query,setQuery]=useState(''),[active,setActive]=useState(0);
- const root=useRef<HTMLDivElement>(null),list=useRef<HTMLDivElement>(null),search=useRef<HTMLInputElement>(null);
- const term=query.trim().toLocaleLowerCase().replace(/\s+/g,'_');
- const options=useMemo(()=>[...(term?[]:[{value:null as string|null,label:t('platformDefault')+' ('+platform+')'}]),...zones.filter(zone=>!term||zone.toLocaleLowerCase().includes(term)).slice(0,200).map(zone=>({value:zone as string|null,label:zone.replace(/_/g,' ')}))],[zones,term,platform]);
- useEffect(()=>{if(!open)return;const close=(event:PointerEvent)=>{if(!root.current?.contains(event.target as Node))setOpen(false);};document.addEventListener('pointerdown',close);requestAnimationFrame(()=>{search.current?.focus({preventScroll:true});root.current?.querySelector('.pref-picker-panel')?.scrollIntoView({block:'nearest',behavior:'smooth'});});return()=>document.removeEventListener('pointerdown',close);},[open]);
- useEffect(()=>{setActive(0);},[term]);
- useEffect(()=>{list.current?.querySelector<HTMLElement>('[data-active=true]')?.scrollIntoView({block:'nearest'});},[active,open]);
- function pick(next:string|null){onChange(next);setOpen(false);setQuery('');}
- return <div className="pref-picker" ref={root}>
-  <button type="button" className="pref-picker-trigger" aria-haspopup="listbox" aria-expanded={open} onClick={()=>setOpen(!open)}><StudioIcon name="globe"/><span>{value?value.replace(/_/g,' '):t('platformDefault')+' ('+platform+')'}</span><StudioIcon name="chevron"/></button>
-  {open&&<div className="pref-picker-panel">
-   <label className="pref-search"><StudioIcon name="search"/><input ref={search} value={query} placeholder={t('searchTimezone')} aria-label={t('searchTimezone')}
-    onChange={event=>setQuery(event.target.value)} onKeyDown={event=>{if(event.key==='ArrowDown'){event.preventDefault();setActive(index=>Math.min(options.length-1,index+1));}else if(event.key==='ArrowUp'){event.preventDefault();setActive(index=>Math.max(0,index-1));}else if(event.key==='Enter'){event.preventDefault();const option=options[active];if(option)pick(option.value);}else if(event.key==='Escape'){event.preventDefault();setOpen(false);}}}/></label>
-   <div className="pref-picker-list" role="listbox" ref={list}>{options.length?options.map((option,index)=><button key={String(option.value)} type="button" role="option" aria-selected={option.value===value} data-active={index===active} onPointerEnter={()=>setActive(index)} onClick={()=>pick(option.value)}>{option.label}{option.value===value&&<StudioIcon name="check"/>}</button>):<p className="pref-muted">{t('noTimezoneMatch')}</p>}</div>
-  </div>}
- </div>;
+const zoneWords:Record<string,[PreferenceWord,PreferenceWord]>={'Asia/Yangon':['zoneMyanmar','cityYangon'],'Asia/Bangkok':['zoneThailand','cityBangkok'],'Asia/Tokyo':['zoneJapan','cityTokyo'],'Asia/Seoul':['zoneKorea','citySeoul']};
+function zoneName(zone:string,t:Text){const words=zoneWords[zone];return words?t(words[0])+' · '+t(words[1]):zone.replace(/_/g,' ');}
+function zoneOffset(zone:string,now:string){try{return new Intl.DateTimeFormat('en-US',{timeZone:zone,timeZoneName:'shortOffset'}).formatToParts(new Date(now)).find(part=>part.type==='timeZoneName')?.value.replace('GMT','UTC')??'';}catch{return '';}}
+function zoneClock(zone:string,now:string,language:string,hour12:boolean){try{return new Intl.DateTimeFormat(language,{timeZone:zone,hour:'2-digit',minute:'2-digit',hour12}).format(new Date(now));}catch{return '';}}
+
+/** Platform default plus the supported countries: Myanmar, Thailand, Japan and Korea. */
+function ZoneChoices({value,platform,zones,now,onChange,t}:{value:string|null;platform:string;zones:string[];now:string;onChange:(value:string|null)=>void;t:Text}){
+ const {language}=usePreferenceText();const {app}=usePage<SharedData>().props;const hour12=app.time_format==='12';
+ const choices:(string|null)[]=[null,...zones];
+ return <div className="pref-zone-grid" role="radiogroup" aria-label={t('timezone')}>{choices.map(zone=>{const target=zone??platform;const selected=value===zone;
+  return <button key={String(zone)} type="button" role="radio" aria-checked={selected} className={selected?'selected':''} onClick={()=>onChange(zone)}>
+   <span className="pref-zone-head"><strong>{zone?t(zoneWords[zone]?.[0]??'timezone'):t('platformDefault')}</strong>{selected&&<StudioIcon name="check"/>}</span>
+   <small>{zone?t(zoneWords[zone]?.[1]??'timezone'):zoneName(platform,t)}</small>
+   <span className="pref-zone-time"><b>{zoneClock(target,now,language,hour12)}</b><em>{zoneOffset(target,now)}</em></span>
+  </button>;})}</div>;
 }
 
 function DevicesCard({data,onChanged,t}:{data:PreferencesData;onChanged:Changed;t:Text}){
