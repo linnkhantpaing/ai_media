@@ -200,11 +200,11 @@ function DisplayCard({data,display,onDisplay,errors,t}:{data:PreferencesData;dis
   <p className="pref-card-intro">{t('displayHint')}</p>
   <div className="pref-text-field"><span>{t('timezone')}</span><ZoneChoices value={display.timezone} platform={platform.timezone} zones={data.profile.timezones} now={now} onChange={timezone=>onDisplay({...display,timezone})} t={t}/>{errors['profile.display.timezone']?.map((message,index)=><small key={index} className="pref-error">{message}</small>)}</div>
   <div className="pref-text-field"><span>{t('dateFormat')}</span><div className="pref-format-grid" role="radiogroup" aria-label={t('dateFormat')}>
-   <button type="button" role="radio" aria-checked={display.date_format===null} className={display.date_format===null?'selected':''} onClick={()=>onDisplay({...display,date_format:null})}><strong>{t('platformDefault')}</strong><small>{example(platform.date_format)}</small></button>
+   <button type="button" role="radio" aria-checked={display.date_format===null} className={display.date_format===null?'selected':''} onClick={()=>onDisplay({...display,date_format:null})} title={t('platformDefault')}><strong>{t('defaultShort')}</strong><small>{example(platform.date_format)}</small></button>
    {dateFormats.map(format=><button key={format} type="button" role="radio" aria-checked={display.date_format===format} className={display.date_format===format?'selected':''} onClick={()=>onDisplay({...display,date_format:format})}><strong>{example(format)}</strong><small>{format==='medium'?'Medium':format==='dmy'?'DD/MM/YYYY':format==='mdy'?'MM/DD/YYYY':'YYYY-MM-DD'}</small></button>)}
   </div></div>
   <div className="pref-text-field"><span>{t('timeFormat')}</span><div className="pref-segment" role="radiogroup" aria-label={t('timeFormat')}>
-   {([null,'12','24'] as const).map(format=><button key={String(format)} type="button" role="radio" aria-checked={display.time_format===format} className={display.time_format===format?'selected':''} onClick={()=>onDisplay({...display,time_format:format})}>{format===null?t('platformDefault'):format==='12'?t('hour12'):t('hour24')}</button>)}
+   {([null,'12','24'] as const).map(format=><button key={String(format)} type="button" role="radio" aria-checked={display.time_format===format} className={display.time_format===format?'selected':''} onClick={()=>onDisplay({...display,time_format:format})}>{format===null?t('defaultShort'):format==='12'?t('hour12'):t('hour24')}</button>)}
   </div></div>
   <div className="pref-preview"><small>{t('preview')}</small><strong>{formatPlatformDate(now,locale,effective,true)}</strong><span>{zoneName(effective.timezone,t)}</span></div>
  </section>;
@@ -221,8 +221,8 @@ function ZoneChoices({value,platform,zones,now,onChange,t}:{value:string|null;pl
  const choices:(string|null)[]=[null,...zones];
  return <div className="pref-zone-grid" role="radiogroup" aria-label={t('timezone')}>{choices.map(zone=>{const target=zone??platform;const selected=value===zone;
   return <button key={String(zone)} type="button" role="radio" aria-checked={selected} className={selected?'selected':''} onClick={()=>onChange(zone)}>
-   <span className="pref-zone-head"><strong>{zone?t(zoneWords[zone]?.[0]??'timezone'):t('platformDefault')}</strong>{selected&&<StudioIcon name="check"/>}</span>
-   <small>{zone?t(zoneWords[zone]?.[1]??'timezone'):zoneName(platform,t)}</small>
+   <span className="pref-zone-head"><strong title={zone?undefined:t('platformDefault')}>{zone?t(zoneWords[zone]?.[0]??'timezone'):t('defaultShort')}</strong>{selected&&<StudioIcon name="check"/>}</span>
+   <small title={zoneName(target,t)}>{zoneWords[target]?t(zoneWords[target][1]):target.split('/').pop()?.replace(/_/g,' ')}</small>
    <span className="pref-zone-time"><b>{zoneClock(target,now,language,hour12)}</b><em>{zoneOffset(target,now)}</em></span>
   </button>;})}</div>;
 }

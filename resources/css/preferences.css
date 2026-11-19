@@ -405,14 +405,23 @@
 }
 
 /* Time zone choices: platform default + Myanmar, Thailand, Japan, Korea */
-.pref-zone-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:7px}
-.pref-zone-grid button{display:flex;flex-direction:column;align-items:stretch;gap:2px;padding:9px 10px;border:0;border-radius:10px;background:color-mix(in srgb,var(--surface) 70%,transparent);color:var(--text);text-align:start;cursor:pointer;box-shadow:var(--pref-raise-sm);transition:background .15s,box-shadow .15s}
+.pref-zone-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:7px}
+.pref-zone-grid button{position:relative;display:grid;grid-template-rows:auto auto auto;align-content:start;gap:1px;min-width:0;padding:8px 10px 9px;border:0;border-radius:10px;background:color-mix(in srgb,var(--surface) 70%,transparent);color:var(--text);text-align:start;cursor:pointer;box-shadow:var(--pref-raise-sm);transition:background .15s,box-shadow .15s}
 .pref-zone-grid button:hover:not(.selected){background:color-mix(in srgb,var(--primary) 10%,var(--surface))}
 .pref-zone-grid button.selected{box-shadow:0 0 0 1.5px var(--primary),0 6px 14px color-mix(in srgb,var(--primary) 22%,transparent);background:color-mix(in srgb,var(--primary) 12%,var(--surface))}
-.pref-zone-head{display:flex;align-items:center;justify-content:space-between;gap:6px}
-.pref-zone-head strong{font-size:11px;font-weight:700}
-.pref-zone-head svg{width:13px;height:13px;color:var(--primary)}
-.pref-zone-grid small{color:var(--text-muted);font-size:9px}
-.pref-zone-time{display:flex;flex-direction:column;gap:0;margin-top:3px}
-.pref-zone-time b{font-size:13px;font-weight:800;letter-spacing:-.2px}
-.pref-zone-time em{font-style:normal;color:var(--text-secondary);font-size:9px}
+.pref-zone-head{display:block;min-width:0;padding-right:14px}
+.pref-zone-head strong,.pref-zone-grid small{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pref-zone-head strong{font-size:11px;font-weight:700;line-height:1.5}
+.pref-zone-head svg{position:absolute;top:8px;right:8px;width:12px;height:12px;color:var(--primary)}
+.pref-zone-grid small{color:var(--text-muted);font-size:9px;line-height:1.5}
+.pref-zone-time{display:flex;flex-direction:column;margin-top:5px;min-width:0}
+.pref-zone-time b{font-size:13px;font-weight:800;letter-spacing:-.2px;line-height:1.35;white-space:nowrap}
+.pref-zone-time em{font-style:normal;color:var(--text-secondary);font-size:9px;white-space:nowrap}
+.pref-format-grid button strong,.pref-format-grid button small{display:block;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* Zone and date-format choices stay on one row; narrow screens swipe instead of leaving an orphan card. */
+.pref-zone-grid,.pref-format-grid{grid-template-columns:none;grid-auto-flow:column;grid-auto-columns:minmax(84px,1fr);overflow-x:auto;scroll-snap-type:x proximity;scrollbar-width:none;padding:3px;margin:-3px}
+.pref-zone-grid::-webkit-scrollbar,.pref-format-grid::-webkit-scrollbar{display:none}
+.pref-zone-grid>button,.pref-format-grid>button{scroll-snap-align:start}
+.pref-format-grid{grid-auto-columns:minmax(88px,1fr)}
+.pref-zone-grid button{padding:8px 8px 9px}
+.pref-zone-head svg{top:7px;right:6px}

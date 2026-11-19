@@ -253,8 +253,9 @@ const words={
  cityBangkok:["Bangkok","ဘန်ကောက်","กรุงเทพฯ"],
  zoneJapan:["Japan","ဂျပန်","ญี่ปุ่น"],
  cityTokyo:["Tokyo","တိုကျို","โตเกียว"],
- zoneKorea:["South Korea","တောင်ကိုရီးယား","เกาหลีใต้"],
+ zoneKorea:["Korea","ကိုရီးယား","เกาหลีใต้"],
  citySeoul:["Seoul","ဆိုးလ်","โซล"],
+ defaultShort:["Default","မူလ","ค่าเริ่มต้น"],
 } as const;
 export type PreferenceWord=keyof typeof words;
 
