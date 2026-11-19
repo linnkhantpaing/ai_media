@@ -67,7 +67,7 @@ export default function Notifications({notifications:initial}:{notifications:Not
      <button type="button" className="cn-button cn-filters-button" onClick={()=>setSheet(true)}><StudioIcon name="filter"/>{t('filters')}{changed&&<i className="cn-filter-dot"/>}</button>
      <span className="cn-toolbar-end">
       {changed&&<ActionTooltip label={t('clearFilters')}><button type="button" className="cn-icon-button" aria-label={t('clearFilters')} onClick={()=>{setQuery('');setPage(1);setFilters(defaults);}}><StudioIcon name="filter-clear"/></button></ActionTooltip>}
-      <ActionTooltip label={t('refresh')}><button type="button" className="cn-icon-button" aria-label={t('refresh')} onClick={()=>{setSpin(true);void load().finally(()=>setTimeout(()=>setSpin(false),400));}}><StudioIcon name="refresh" className={spin?'cn-spin':''}/></button></ActionTooltip>
+      <ActionTooltip label={t('refresh')}><button type="button" className="cn-icon-button" aria-label={t('refresh')} onClick={()=>{setSpin(true);void load().finally(()=>setTimeout(()=>setSpin(false),400));}}><StudioIcon name="reload" className={spin?'cn-spin':''}/></button></ActionTooltip>
      </span>
     </div>}
     {failed&&<div className="cn-error" role="alert"><StudioIcon name="alert"/>{t('loadFailed')}<button type="button" className="cn-link" onClick={()=>void load()}>{t('retryLoad')}</button></div>}

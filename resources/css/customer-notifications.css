@@ -129,7 +129,7 @@
 .cn-icon-button:hover:not(:disabled){background:color-mix(in srgb,var(--primary) 12%,transparent);color:var(--primary)}
 .cn-icon-button:disabled{opacity:.4;cursor:not-allowed}
 .cn-spin{animation:cn-spin .7s linear infinite}
-@keyframes cn-spin{to{transform:rotate(-360deg)}}
+@keyframes cn-spin{to{transform:rotate(360deg)}}
 .cn-filters-button{display:none}
 .cn-filter-dot{width:6px;height:6px;border-radius:50%;background:var(--primary)}
 .cn-selection{padding:4px 8px;border-radius:10px;background:color-mix(in srgb,var(--primary) 12%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--primary) 30%,transparent);animation:cn-drop .15s ease-out}
