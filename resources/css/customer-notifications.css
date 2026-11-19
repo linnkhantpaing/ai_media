@@ -64,9 +64,11 @@
 .cn-caught-up,.cn-empty{display:flex;flex-direction:column;align-items:center;gap:6px;padding:34px 20px 30px;text-align:center}
 .cn-caught-up strong,.cn-empty h2{margin:6px 0 0;font-size:15px;font-weight:800}
 .cn-caught-up p,.cn-empty p{margin:0;max-width:300px;color:var(--text-secondary);font-size:11px}
-.cn-bell-art{position:relative;display:grid;place-items:center;width:74px;height:74px;border-radius:50%;background:radial-gradient(circle,color-mix(in srgb,var(--primary) 22%,transparent),transparent 70%);color:var(--primary)}
-.cn-bell-art svg{width:38px;height:38px;filter:drop-shadow(0 0 12px color-mix(in srgb,var(--primary) 60%,transparent))}
-.cn-bell-art:after{content:'';position:absolute;top:10px;right:6px;width:14px;height:10px;border-top:2px solid var(--primary);border-right:2px solid var(--primary);border-radius:0 10px 0 0;opacity:.7}
+.cn-bell-art{position:relative;display:grid;place-items:center;width:76px;height:76px;margin-bottom:4px;border-radius:50%;background:radial-gradient(circle at 50% 40%,color-mix(in srgb,var(--primary) 26%,var(--surface)),color-mix(in srgb,var(--primary) 8%,var(--surface)) 70%);color:var(--primary);box-shadow:inset 0 1px 0 #ffffff14,0 10px 26px #0007,0 0 0 8px color-mix(in srgb,var(--primary) 6%,transparent),0 0 0 16px color-mix(in srgb,var(--primary) 3%,transparent)}
+.cn-page .cn-bell-art svg,.cn-panel .cn-bell-art svg,.cn-sheet .cn-bell-art svg{width:32px;height:32px;filter:drop-shadow(0 0 10px color-mix(in srgb,var(--primary) 55%,transparent))}
+.cn-bell-art:after{content:"";position:absolute;right:6px;bottom:6px;width:20px;height:20px;border-radius:50%;background:var(--mint) url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 24 24%27 fill=%27none%27 stroke=%27%230b2220%27 stroke-width=%273.2%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27%3E%3Cpath d=%27m5 12.5 4.5 4.5L19 7.5%27/%3E%3C/svg%3E") center/12px no-repeat;box-shadow:0 0 0 3px var(--surface),0 4px 10px #0008}
+.cn-panel .cn-bell-art,.cn-sheet .cn-bell-art{width:64px;height:64px}
+.cn-panel .cn-bell-art svg,.cn-sheet .cn-bell-art svg{width:28px;height:28px}
 .cn-skeletons{display:flex;flex-direction:column;gap:8px;padding:10px 14px}
 .cn-skeletons span{height:54px;border-radius:10px;background:linear-gradient(90deg,#ffffff08,#ffffff12,#ffffff08);background-size:200% 100%;animation:cn-shimmer 1.3s linear infinite}
 @keyframes cn-shimmer{to{background-position:-200% 0}}
