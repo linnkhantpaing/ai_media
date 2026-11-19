@@ -1128,3 +1128,9 @@ Supersedes the "Legacy implementation caveat" in section 8 and the "re-enable pa
 - Quick Start opens `/projects/new?workflow=movie|translate|subtitles` (with the default preset when set); Studio now honours `workflow` and keeps the output valid. Workflows not in the package are locked and link to Billing. Contact Support opens the header chat (`open-support-chat` event); the card shows unread replies.
 - New customers see a Getting Started checklist (5 steps from real data) until their first export; Hide is stored in `users.dashboard_checklist_hidden_at` (migration `2026_11_19_120000`, additive, applied locally).
 - Tests: `CustomerDashboardTest` (4). Browser QA on isolated SQLite covered active, new, expired, over-limit and unlimited states in en/my/th at 1672/1440/1024/390px (no horizontal overflow, no page errors), chart ranges and tooltip, action dismiss, support chat, Quick Start preselect and cancel confirmation.
+
+### Forgot / Reset password match the sign-in card - 2026-11-19
+
+- Forgot password and Reset password now use `CinematicLoginLayout` (same film-ribbon background, compact card, language switcher) with a page badge (key "Reset Password" / lock "New Password"). The old `layouts/auth-layout.tsx` (separate title, description and "Private workspace" footer) was removed.
+- Forgot: email + Send reset link + Back to sign in; the sent notice is a compact mint box. Reset: the email from the link is read-only (editable again if the server rejects it), new + confirm password, and five live rule chips (12+, Aa, 0-9, !@#, match) replace the long policy sentence. Server rules (`Password::defaults`) are unchanged.
+- Browser QA (isolated SQLite): en/my/th at 1440x900, 1366x657, 390x844 and 360x640 - no vertical or horizontal scroll in sign-in, forgot, sent, reset and reset-error states.

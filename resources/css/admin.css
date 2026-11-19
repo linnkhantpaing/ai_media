@@ -176,7 +176,6 @@
 @media (max-height: 600px) and (min-width: 641px) { .admin-compact-login { padding-top: 50px; padding-bottom: 20px; } .admin-compact-login .admin-login-card { padding-top: 18px; padding-bottom: 22px; } .admin-compact-login .admin-login-brand { width: 180px; margin-bottom: 9px; } .admin-compact-login .admin-login-form { margin-top: 17px; gap: 12px; } }
 .admin-compact-login .auth-text-link { color: var(--mint); font-size: 10px; }
 .admin-compact-login .auth-text-link:hover { color: #9CF5D7; }
-.admin-compact-login .auth-notice { margin: 17px 0 0; text-align: left; }
 
 /* Phase 2 admin menu: groups stay expanded; only the nav body scrolls. */
 .admin-sidebar { height: 100dvh; }
@@ -198,4 +197,15 @@
 .admin-sidebar-item.is-planned:hover, .admin-sidebar-item.is-planned:focus-visible { background: color-mix(in srgb, var(--primary) 5%, var(--sidebar)); color: var(--text); }
 .admin-sidebar-note { margin: 9px 12px 12px; padding: 9px 11px; }
 .admin-sidebar-note p { margin-top: 5px; font-size: 9px; line-height: 1.85; }
-@media (max-width: 760px) { .admin-sidebar-nav { padding-top: 9px; padding-bottom: 14px; } .admin-sidebar-item { min-height: 41px; font-size: 11px; } .admin-navigation-heading { font-size: 10px; } }
+@media (max-width: 760px) { .admin-sidebar-nav { padding-top: 9px; padding-bottom: 14px; } .admin-sidebar-item { min-height: 41px; font-size: 11px; } .admin-navigation-heading { font-size: 10px; } }.admin-compact-login .auth-back-link { min-height: 32px; margin: 13px auto -9px; font-size: 10px; color: var(--mint); }
+.admin-compact-login .auth-back-link:hover { color: #9CF5D7; }
+.admin-compact-login .auth-input-wrap:has(input[readonly]) { background: #0C0C1AA6; }
+.admin-compact-login .auth-input-wrap > input[readonly] { color: var(--text-secondary); cursor: default; }
+.admin-compact-login .auth-rules { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin: -5px 0 0; padding: 0; list-style: none; }
+.admin-compact-login .auth-rules li { display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; border-radius: 20px; background: #FFFFFF0A; color: var(--text-muted); font-size: 10px; line-height: 1.6; transition: color .2s, background .2s; }
+.admin-compact-login .auth-rules li > svg { width: 10px; height: 10px; flex-shrink: 0; }
+.admin-compact-login .auth-rules li.is-ok { background: #72E2C314; color: var(--mint); }
+.admin-compact-login .auth-form-error { margin: -5px 0 0; font-size: 10px; text-align: center; }
+.admin-compact-login .auth-notice { margin: 15px 0 0; padding: 8px 11px; border-radius: 10px; font-size: 10px; line-height: 1.7; text-align: center; }
+@media (max-width: 640px) { .admin-compact-login .auth-rules { gap: 4px; } .admin-compact-login .auth-rules li { padding: 2px 7px; } }
+@media (max-height: 680px) and (max-width: 640px) { .admin-compact-login { padding-top: 58px; padding-bottom: 14px; } .admin-compact-login .admin-login-card { padding-top: 20px; padding-bottom: 20px; } .admin-compact-login .admin-login-brand { margin-bottom: 9px; } .admin-compact-login .admin-login-form { margin-top: 17px; gap: 12px; } }
