@@ -5,6 +5,10 @@ namespace App\Http\Requests\Admin;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
+/**
+ * Admin subscription actions are limited to closing access. Paid periods are
+ * created, renewed or changed only by approving a payment in Payments.
+ */
 class SubscriptionActionRequest extends FormRequest
 {
     public function authorize(): bool
@@ -21,21 +25,20 @@ class SubscriptionActionRequest extends FormRequest
 
     public function rules(): array
     {
-        $period = in_array($this->input('action'), ['renew', 'change'], true);
-
         return [
-            'action' => ['required', Rule::in(['renew', 'extend', 'change', 'cancel', 'end'])],
+            'action' => ['required', Rule::in(['cancel', 'end'])],
             'request_id' => ['required', 'uuid'], 'revision' => ['required', 'integer', 'min:1'],
             'reason' => ['required', 'string', 'max:500'], 'note' => ['nullable', 'string', 'max:500'],
-            'package_id' => [$period ? 'required' : 'prohibited', 'integer', 'exists:packages,id'],
-            'package_version' => [$period ? 'required' : 'prohibited', 'integer', 'min:1'],
-            'validity_mode' => [$period ? 'required' : 'prohibited', Rule::in(['package', 'custom'])],
-            'starts_on' => [$period ? 'required' : 'prohibited', 'date_format:Y-m-d'],
-            'ends_on' => [$period || $this->input('action') === 'extend' ? 'required' : 'prohibited', 'date_format:Y-m-d'],
-            'timing' => [$period ? 'required' : 'prohibited', Rule::in(['after', 'now', 'custom'])],
             'confirm_end' => [$this->input('action') === 'end' ? 'required' : 'sometimes', 'accepted'],
-            'replace_upcoming' => ['sometimes', 'boolean'], 'replace_current' => ['sometimes', 'boolean'],
+            'package_id' => ['prohibited'], 'package_version' => ['prohibited'], 'validity_mode' => ['prohibited'],
+            'starts_on' => ['prohibited'], 'ends_on' => ['prohibited'], 'timing' => ['prohibited'],
             'snapshot' => ['prohibited'], 'closed_kind' => ['prohibited'], 'user_id' => ['prohibited'],
         ];
+    }
+
+    /** @return array<string, string> */
+    public function messages(): array
+    {
+        return ['action.in' => 'Paid periods are created only by approving a payment. Use Payments to renew or change a package.'];
     }
 }

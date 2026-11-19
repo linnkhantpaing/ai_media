@@ -1,7 +1,7 @@
 export type PackageStatus='draft'|'active'|'inactive'|'archived';
 export type PackageType='trial'|'paid';
 export type PackageAction='publish'|'activate'|'deactivate'|'archive'|'restore';
-export type PackageFeature='local'|'youtube'|'subs'|'dub'|'mp4'|'srt'|'audio'|'script_edit'|'voice_preview'|'video_preview'|'subtitle_style'|'cover_subtitles'|'layout'|'keep_background';
+export type PackageFeature='local'|'youtube'|'movie'|'subs'|'dub'|'mp4'|'srt'|'audio'|'script_edit'|'voice_preview'|'video_preview'|'subtitle_style'|'cover_subtitles'|'layout'|'keep_background';
 export interface PackageDefinition {name?:string;code?:string;type?:PackageType;currency:string|null;price:string|null;price_minor:number|null;validity_days:number|null;included_minutes:number|null;included_seconds:number|null;video_limit:number|null;storage_gib:number|null;storage_bytes:number|null;max_video_seconds:number|null;max_upload_mib:number|null;max_upload_bytes:number|null;concurrency:number|null;queue_limit:number|null;retention_days:number|null;description:string;note:string;features:Record<PackageFeature,boolean>}
 export interface CatalogPackage {id:number;name:string;code:string;type:PackageType;status:PackageStatus;revision:number;published_version:number;definition:PackageDefinition;assigned_users:number;created_at:string;updated_at:string}
 export interface PackageCapabilities {currencies:string[];upload_size_options_mib:number[];max_upload_mib:number;max_video_seconds:number;storage_gib:number;retention_enabled:boolean;retention_days:number;assignment_ready:true}

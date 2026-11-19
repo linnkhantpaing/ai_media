@@ -66,7 +66,7 @@ export default function MyPlan({overview:o,exports,filters,availablePlans}:PlanP
  const status=(['active','upcoming','expired','ended','cancelled','replaced','suspended'].includes(o.status)?o.status:'none') as PlanWord;
  const state=o.expiring?'expiring':status;
  const support=app.support_url?.startsWith('https://')?app.support_url:app.support_email?'mailto:'+app.support_email:null;
- const feature=(key:PlanWord)=>!!o.features[key==='ass'?'srt':key==='movie'||key==='translate'?'dub':key];
+ const feature=(key:PlanWord)=>!!o.features[key==='ass'?'srt':key==='translate'?'dub':key];
  const pages=Array.from(new Set([1,exports.current_page-1,exports.current_page,exports.current_page+1,exports.last_page])).filter(p=>p>0&&p<=exports.last_page).sort((a,b)=>a-b);
  return <AppLayout frame="myPlan"><Head title={t('title')}/><div className="my-plan">
   <header className="plan-heading"><div className="plan-heading-title"><div><h1>{t('title')}</h1><p>{t('description')}</p></div></div>

@@ -7,7 +7,6 @@ use App\Models\MediaProject;
 use App\Models\MediaRun;
 use App\Models\Package;
 use App\Models\PackageVersion;
-use App\Models\PaymentTransaction;
 use App\Models\UsageRecord;
 use App\Models\User;
 use App\Services\CustomerAccounts;
@@ -16,7 +15,6 @@ use App\Services\UsageLedger;
 use App\Support\MediaSettings;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
-use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
 
 class PackageFeatureAccessTest extends TestCase
@@ -119,62 +117,5 @@ class PackageFeatureAccessTest extends TestCase
         $other = MediaProject::factory()->create();
         $this->patchJson('/media/projects/'.$other->id, $this->settings())->assertNotFound();
         $this->assertSame('Example recap', $other->fresh()->title);
-    }
-
-    public function test_feature_only_upgrade_also_fixes_scheduled_renewal_without_changing_dates_payment_links_or_usage(): void
-    {
-        $future = CustomerPackageAssignment::create([
-            ...$this->assignment->toArray(), 'id' => null, 'source' => 'payment_renewal',
-            'starts_at' => $this->assignment->ends_at, 'ends_at' => $this->assignment->ends_at->addDays(30),
-            'allowance_starts_at' => $this->assignment->ends_at,
-        ]);
-        $payment = PaymentTransaction::factory()->create(['user_id' => $this->customer->id, 'subscription_id' => $future->id, 'status' => 'approved', 'package_version_id' => $future->package_version_id, 'package_snapshot' => $future->snapshot]);
-        $beforePayment = $payment->fresh()->getAttributes();
-        $beforeCurrent = $this->assignment->getAttributes();
-        $beforeFuture = $future->getAttributes();
-        UsageRecord::factory()->create(['user_id' => $this->customer->id, 'allowance_start' => $this->assignment->starts_at, 'charged_seconds' => 120]);
-        $requestId = (string) Str::uuid();
-        $revision = $this->customer->account_revision;
-        $service = app(CustomerAccounts::class);
-        $result = $service->upgradePackageFeatures($this->admin, $this->customer->id, $this->package->id, 3, $revision, 'Apply the published feature upgrade', $requestId);
-        $this->assertSame(2, $result['updated_periods']);
-        foreach ([$this->assignment, $future] as $period) {
-            $period->refresh();
-            $this->assertSame(3, $period->snapshot['version']);
-            $this->assertTrue($period->snapshot['definition']['features']['dub']);
-            $before = $period->id === $future->id ? $beforeFuture : $beforeCurrent;
-            foreach (['starts_at', 'ends_at', 'allowance_starts_at', 'source', 'supersedes_id'] as $field) {
-                $this->assertSame($before[$field] ?? null, $period->getAttributes()[$field] ?? null);
-            }
-        }
-        $this->assertSame($beforePayment, $payment->fresh()->getAttributes());
-        $this->assertSame(120, app(UsageLedger::class)->balances($this->customer->id, $this->assignment->starts_at)['seconds']);
-        $this->assertSame(2, CustomerPackageAssignment::where('user_id', $this->customer->id)->count());
-        $again = $service->upgradePackageFeatures($this->admin, $this->customer->id, $this->package->id, 3, $revision, 'Apply the published feature upgrade', $requestId);
-        $this->assertTrue($again['replayed']);
-        $this->assertDatabaseCount('customer_account_events', 1);
-    }
-
-    public function test_feature_upgrade_refuses_financial_changes_or_removing_an_existing_feature(): void
-    {
-        $version = PackageVersion::where('package_id', $this->package->id)->where('number', 3)->firstOrFail();
-        $definition = $version->definition;
-        $version->update(['definition' => [...$definition, 'storage_bytes' => 99]]);
-        try {
-            app(CustomerAccounts::class)->upgradePackageFeatures($this->admin, $this->customer->id, $this->package->id, 3, $this->customer->account_revision, 'Upgrade features', (string) Str::uuid());
-            $this->fail('Changed allowance terms must require a normal assignment review.');
-        } catch (ValidationException $error) {
-            $this->assertArrayHasKey('package_version', $error->errors());
-        }
-        $definition['features']['local'] = false;
-        $version->update(['definition' => $definition]);
-        try {
-            app(CustomerAccounts::class)->upgradePackageFeatures($this->admin, $this->customer->id, $this->package->id, 3, $this->customer->account_revision, 'Upgrade features', (string) Str::uuid());
-            $this->fail('Existing features must not be removed by this operation.');
-        } catch (ValidationException $error) {
-            $this->assertArrayHasKey('package_version', $error->errors());
-        }
-        $this->assertSame(2, $this->assignment->fresh()->snapshot['version']);
-        $this->assertDatabaseCount('customer_account_events', 0);
     }
 }

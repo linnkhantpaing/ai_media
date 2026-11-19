@@ -76,3 +76,4 @@
  .recap-workflow-toolbar .recap-steps li:not(:last-child):after{content:'';position:static;flex:1 0 12px;align-self:center;width:auto;height:1px;margin-inline:6px 10px;background:var(--text-muted);opacity:.65}
  .recap-studio .recap-workflow-toolbar .recap-steps li>.recap-step-label{flex:0 1 auto;overflow-wrap:normal;word-break:normal}
 }
+.recap-plan-locked{border:0;margin:0;padding:0;min-width:0;display:flex;flex-direction:column;gap:20px}.recap-plan-locked>:not(.recap-plan-lock-note){opacity:.5}.recap-plan-locked *{cursor:not-allowed}.recap-plan-lock-note{display:flex;align-items:center;flex-wrap:wrap;gap:6px;color:var(--text-secondary);font-size:10px}.recap-plan-lock-note svg{width:14px!important;height:14px!important;color:var(--primary)}.recap-plan-locked .recap-plan-link{cursor:pointer}.recap-plan-link{color:var(--primary);font-weight:700;text-decoration:none}.recap-plan-link:hover,.recap-plan-link:focus-visible{text-decoration:underline}

@@ -49,7 +49,7 @@ class CustomerPlan
             'jobs' => ['running' => $running, 'queued' => $queued, 'concurrency' => $definition['concurrency'] ?? null, 'queue_limit' => $definition['queue_limit'] ?? null],
             'limits' => ['duration' => $definition['max_video_seconds'] ?? null, 'upload' => $definition['max_upload_bytes'] ?? (isset($definition['max_upload_mib']) ? $definition['max_upload_mib'] * 1048576 : null),
                 'retention_days' => $definition['retention_days'] ?? null, 'cleanup_enabled' => (bool) ($policy['retention_enabled'] ?? false)],
-            'features' => array_intersect_key($definition['features'] ?? [], array_flip(['local', 'youtube', 'subs', 'dub', 'mp4', 'srt', 'audio', 'script_edit', 'voice_preview', 'video_preview', 'subtitle_style', 'cover_subtitles', 'layout', 'keep_background'])),
+            'features' => PackageCatalog::features($definition),
             'testing' => StudioTesting::enabled(), 'updated_at' => now()->toIso8601String(),
         ];
     }

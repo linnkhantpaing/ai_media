@@ -25,7 +25,7 @@ export interface MediaProject {
     links: Record<'scenes' | 'styledSubtitles' | 'status' | 'upload' | 'complete' | 'update' | 'destroy' | 'uploadPage' | 'setup' | 'analysis' | 'start' | 'generate' | 'script' | 'retry' | 'cancel' | 'reopen' | 'importRetry' | 'importCancel' | 'source' | 'poster' | 'video' | 'audio' | 'previews' | 'subtitles', string>;
 }
 export interface MediaPageProps {
-    testingMode?:boolean; features?:Record<string,boolean>|null; studioDefaults?:MediaSettings; initialProject: MediaProject | null; recentProjects?: MediaProject[];
+    testingMode?:boolean; features?:Record<string,boolean>|null; planActive?:boolean; billingUrl?:string; studioDefaults?:MediaSettings; initialProject: MediaProject | null; recentProjects?: MediaProject[];
     runtime: { mediaReady: boolean; aiReady: boolean; backgroundSeparation: boolean; voices: string[]; youtubeReady: boolean };
     limits: { bytes: number; duration: number; chunkBytes: number };
     storage: { disk: string; ready: boolean; used: number; limit: number };

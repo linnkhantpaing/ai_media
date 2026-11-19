@@ -380,4 +380,32 @@ class CustomerPackageAssignmentTest extends TestCase
         $free = $this->publishedPackage();
         $this->postJson('/admin/users', $this->payload($free))->assertCreated()->assertJsonPath('customer.package.type', 'trial');
     }
+
+    public function test_account_correction_cannot_grant_a_different_paid_package(): void
+    {
+        $free = $this->publishedPackage();
+        $paid = Package::factory()->create(['status' => 'active', 'published_version' => 1]);
+        PackageVersion::create(['package_id' => $paid->id, 'number' => 1, 'definition' => $paid->definition, 'actor_id' => $this->admin->id]);
+        $id = $this->postJson('/admin/users', $this->payload($free))->assertCreated()->json('customer.id');
+        $user = User::findOrFail($id);
+        $this->patchJson('/admin/users/'.$id, $this->editPayload($user, $paid, ['name' => 'Must Not Save']))
+            ->assertUnprocessable()->assertJsonValidationErrors('package_id');
+        $this->assertSame('Customer', $user->fresh()->name);
+        $this->assertDatabaseCount('customer_package_assignments', 1);
+        $this->assertSame($free->id, $user->fresh()->currentPackageAssignment->package_id);
+    }
+
+    public function test_account_correction_can_still_fix_dates_of_the_current_paid_package(): void
+    {
+        $paid = Package::factory()->create(['status' => 'active', 'published_version' => 1]);
+        $version = PackageVersion::create(['package_id' => $paid->id, 'number' => 1, 'definition' => $paid->definition, 'actor_id' => $this->admin->id]);
+        $user = User::factory()->create(['is_admin' => false, 'account_status' => 'active']);
+        CustomerPackageAssignment::create([
+            'user_id' => $user->id, 'package_id' => $paid->id, 'package_version_id' => $version->id, 'assigned_by' => $this->admin->id,
+            'snapshot' => ['name' => $paid->name, 'code' => $paid->code, 'type' => 'paid', 'version' => 1, 'definition' => $version->definition],
+            'starts_at' => now()->startOfDay(), 'ends_at' => now()->startOfDay()->addDays(30), 'source' => 'payment_new',
+        ]);
+        $this->patchJson('/admin/users/'.$user->id, $this->editPayload($user, $paid, ['validity_mode' => 'custom', 'ends_on' => now()->addDays(31)->toDateString()]))
+            ->assertOk()->assertJsonPath('customer.package.package_id', $paid->id)->assertJsonPath('customer.package.period_days', 31);
+    }
 }

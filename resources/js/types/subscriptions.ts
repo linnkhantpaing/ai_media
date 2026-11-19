@@ -1,5 +1,5 @@
 import type {AccountPackageOption} from './accounts';
-export type SubscriptionAction='renew'|'extend'|'change'|'cancel'|'end';
+export type SubscriptionAction='cancel'|'end';
 export type SubscriptionStatus='active'|'upcoming'|'expired'|'ended'|'cancelled'|'replaced';
 export interface SubscriptionDefinition {validity_days:number;storage_gib:number;included_minutes:number;video_limit:number|null;concurrency:number;max_upload_mib:number;max_video_seconds:number;retention_days:number;features:Record<string,boolean>;}
 export interface Subscription {id:number;code:string;revision:number;customer:{id:number;name:string;email:string;status:string};package:{id:number;name:string;code:string;version:number;type:string;definition:SubscriptionDefinition};starts_at:string;ends_at:string;starts_on:string;ends_on:string;status:SubscriptionStatus;expiring:boolean;days_left:number;starts_in:number;source:string;closed_at:string|null;allowance_starts_at:string;usage:{videos:number|null;processing_minutes:number|null};actions:SubscriptionAction[];show_url:string;action_url:string;next_period?:{id:number;name:string;starts_at:string;ends_at:string}|null;}

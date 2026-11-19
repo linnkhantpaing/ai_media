@@ -43,12 +43,13 @@ class SubscriptionManagementTest extends TestCase
         $this->actingAs($this->admin, 'admin');
     }
 
-    private function payload(array $extra = []): array
+    /** Simulates the period that approving a renewal payment creates. */
+    private function schedule(string $startsAt = '2026-12-12 00:00:00', string $endsAt = '2027-01-11 00:00:00', string $source = 'payment_renewal', ?CustomerPackageAssignment $after = null): CustomerPackageAssignment
     {
-        return array_replace([
-            'action' => 'renew', 'revision' => $this->customer->fresh()->account_revision, 'request_id' => (string) Str::uuid(), 'reason' => 'Customer requested renewal',
-            'package_id' => $this->package->id, 'package_version' => 1, 'timing' => 'after', 'validity_mode' => 'package', 'starts_on' => '2026-12-12', 'ends_on' => '2027-01-11',
-        ], $extra);
+        $period = ($after ?? $this->assignment)->replicate();
+        $period->forceFill(['starts_at' => $startsAt, 'ends_at' => $endsAt, 'source' => $source, 'allowance_starts_at' => $startsAt, 'closed_kind' => null, 'closed_at' => null])->save();
+
+        return $period;
     }
 
     private function send(array $data, ?int $id = null): TestResponse
@@ -74,21 +75,20 @@ class SubscriptionManagementTest extends TestCase
         $this->actingAs($this->customer, 'web');
         $this->getJson('/admin/subscriptions')->assertUnauthorized();
         $this->getJson('/admin/subscriptions/'.$this->assignment->id)->assertUnauthorized();
-        $this->send($this->payload())->assertUnauthorized();
+        $this->send($this->simple('end', ['confirm_end' => true]))->assertUnauthorized();
         $this->assertDatabaseCount('customer_package_assignments', 1);
     }
 
     public function test_non_admin_guard_identity_is_rejected(): void
     {
         $this->actingAs($this->customer, 'admin')->getJson('/admin/subscriptions')->assertForbidden();
-        $this->send($this->payload())->assertForbidden();
+        $this->send($this->simple('end', ['confirm_end' => true]))->assertForbidden();
     }
 
-    public function test_renewal_keeps_current_access_until_boundary_without_a_scheduler(): void
+    public function test_payment_scheduled_period_keeps_current_access_until_boundary_without_a_scheduler(): void
     {
         $original = $this->assignment->fresh()->getAttributes();
-        $response = $this->send($this->payload())->assertOk();
-        $nextId = $response->json('id');
+        $nextId = $this->schedule()->id;
         $this->assertSame($this->assignment->id, $this->customer->fresh()->currentPackageAssignment->id);
         $this->assertSame($original, $this->assignment->fresh()->getAttributes());
         $this->getJson('/admin/subscriptions')->assertJsonPath('summary.active', 1)->assertJsonPath('summary.upcoming', 1);
@@ -99,74 +99,40 @@ class SubscriptionManagementTest extends TestCase
 
     public function test_duplicate_request_is_replayed_and_changed_replay_is_rejected(): void
     {
-        $payload = $this->payload();
+        $payload = $this->simple('end', ['confirm_end' => true]);
         $this->send($payload)->assertOk()->assertJsonPath('replayed', false);
         $this->send($payload)->assertOk()->assertJsonPath('replayed', true);
         $this->send(array_replace($payload, ['reason' => 'Different']))->assertConflict();
-        $this->assertDatabaseCount('customer_package_assignments', 2);
+        $this->assertDatabaseCount('customer_package_assignments', 1);
         $this->assertDatabaseCount('customer_account_events', 1);
     }
 
-    public function test_stale_revision_and_changed_published_version_are_rejected(): void
+    public function test_stale_revision_is_rejected(): void
     {
-        $this->send($this->payload(['revision' => 99]))->assertConflict();
-        $this->send($this->payload(['package_version' => 2]))->assertConflict();
-        $this->assertDatabaseCount('customer_package_assignments', 1);
-    }
-
-    public function test_disabled_package_reason_and_bad_dates_validate_server_side(): void
-    {
-        $this->send($this->payload(['reason' => ' ']))->assertUnprocessable()->assertJsonValidationErrors('reason');
-        $this->send($this->payload(['ends_on' => '2026-12-11']))->assertUnprocessable()->assertJsonValidationErrors('ends_on');
-        $this->send($this->payload(['ends_on' => '2026-02-30']))->assertUnprocessable()->assertJsonValidationErrors('ends_on');
-        $this->send($this->payload(['ends_on' => '2027-01-12']))->assertUnprocessable()->assertJsonValidationErrors('ends_on');
-        $this->send($this->payload(['timing' => 'custom', 'starts_on' => '2026-11-11']))->assertUnprocessable()->assertJsonValidationErrors('starts_on');
-        $this->package->update(['status' => 'inactive']);
-        $this->send($this->payload())->assertUnprocessable()->assertJsonValidationErrors('package_id');
-    }
-
-    public function test_scheduled_renewal_requires_explicit_replacement_and_cancellation_preserves_current(): void
-    {
-        $first = $this->send($this->payload())->assertOk()->json('id');
-        $this->send($this->payload())->assertUnprocessable()->assertJsonValidationErrors('replace_upcoming');
-        $second = $this->send($this->payload(['replace_upcoming' => true]))->assertOk()->json('id');
-        $this->assertSame('cancelled', CustomerPackageAssignment::find($first)->status());
-        $this->send($this->simple('cancel'), $second)->assertOk();
-        $this->assertSame($this->assignment->id, $this->customer->fresh()->currentPackageAssignment->id);
+        $this->send($this->simple('end', ['confirm_end' => true, 'revision' => 99]))->assertConflict();
         $this->assertSame('active', $this->assignment->fresh()->status());
     }
 
-    public function test_extension_keeps_allowance_origin_and_old_terms_and_rejects_overlap(): void
+    public function test_paid_period_actions_are_only_available_through_payments(): void
     {
-        $id = $this->send($this->simple('extend', ['ends_on' => '2026-12-20']))->assertOk()->json('id');
-        $replacement = CustomerPackageAssignment::find($id);
-        $this->assertSame($this->assignment->snapshot['definition'], $replacement->snapshot['definition']);
-        $this->assertTrue($replacement->allowance_starts_at->equalTo($this->assignment->starts_at));
-        $this->assertSame('2026-12-12', $this->assignment->fresh()->ends_at->toDateString());
-        $this->assertSame('2026-12-20', $replacement->ends_at->toDateString());
-        $this->send($this->simple('extend', ['ends_on' => '2026-12-21']))->assertConflict();
-        $this->assignment = $replacement;
-        $this->send($this->payload(['starts_on' => '2026-12-20', 'ends_on' => '2027-01-19']))->assertOk();
-        $this->send($this->simple('extend', ['ends_on' => '2026-12-21']))->assertUnprocessable()->assertJsonValidationErrors('ends_on');
+        $period = ['package_id' => $this->package->id, 'package_version' => 1, 'timing' => 'after', 'validity_mode' => 'package', 'starts_on' => '2026-12-12', 'ends_on' => '2027-01-11'];
+        foreach (['renew', 'change', 'extend'] as $action) {
+            $this->send($this->simple($action, $period))->assertUnprocessable()->assertJsonValidationErrors('action');
+        }
+        $this->send($this->simple('end', ['confirm_end' => true, 'ends_on' => '2027-01-11']))->assertUnprocessable()->assertJsonValidationErrors('ends_on');
+        $this->send($this->simple('end', ['confirm_end' => true, 'reason' => ' ']))->assertUnprocessable()->assertJsonValidationErrors('reason');
+        $this->assertDatabaseCount('customer_package_assignments', 1);
+        $this->assertDatabaseCount('customer_account_events', 0);
+        $this->assertSame('active', $this->assignment->fresh()->status());
     }
 
-    public function test_immediate_change_preserves_usage_origin_and_published_snapshot(): void
+    public function test_cancelling_a_scheduled_period_preserves_current_access(): void
     {
-        $id = $this->send($this->payload(['action' => 'change', 'timing' => 'now', 'starts_on' => '2026-11-12', 'ends_on' => '2026-12-12']))->assertOk()->json('id');
-        $replacement = CustomerPackageAssignment::find($id);
-        $this->assertTrue($replacement->allowance_starts_at->equalTo($this->assignment->starts_at));
-        $this->assertSame('package_change', $replacement->source);
-        $this->assertSame($this->package->definition, $replacement->snapshot['definition']);
-        $this->assertSame($id, $this->customer->fresh()->currentPackageAssignment->id);
-        $this->assertSame('replaced', $this->assignment->fresh()->status());
-    }
-
-    public function test_renew_now_requires_explicit_confirmation_for_allocation_reset(): void
-    {
-        $payload = $this->payload(['timing' => 'now', 'starts_on' => '2026-11-12', 'ends_on' => '2026-12-12']);
-        $this->send($payload)->assertUnprocessable()->assertJsonValidationErrors('starts_on');
-        $id = $this->send(array_replace($payload, ['replace_current' => true]))->assertOk()->json('id');
-        $this->assertSame('2026-11-12 10:00:00', CustomerPackageAssignment::find($id)->allowance_starts_at->format('Y-m-d H:i:s'));
+        $next = $this->schedule();
+        $this->send($this->simple('cancel'), $next->id)->assertOk();
+        $this->assertSame('cancelled', $next->fresh()->status());
+        $this->assertSame($this->assignment->id, $this->customer->fresh()->currentPackageAssignment->id);
+        $this->assertSame('active', $this->assignment->fresh()->status());
     }
 
     public function test_end_access_does_not_suspend_account_or_delete_files(): void
@@ -207,16 +173,16 @@ class SubscriptionManagementTest extends TestCase
 
     public function test_history_keeps_admin_reason_and_before_after_and_has_no_billing_side_effect(): void
     {
-        $this->send($this->payload())->assertOk();
-        $this->actingAs($this->customer, 'web');
-        $this->getJson('/admin/subscriptions/'.$this->assignment->id)->assertOk()->assertJsonPath('history.0.actor', $this->admin->name)->assertJsonPath('history.0.metadata.reason', 'Customer requested renewal')->assertJsonPath('history.0.metadata.before.id', $this->assignment->id)->assertJsonPath('next.source', 'renewal');
+        $this->send($this->simple('end', ['confirm_end' => true, 'reason' => 'Customer requested closure']))->assertOk();
+        $this->getJson('/admin/subscriptions/'.$this->assignment->id)->assertOk()->assertJsonPath('history.0.actor', $this->admin->name)->assertJsonPath('history.0.metadata.reason', 'Customer requested closure')->assertJsonPath('history.0.metadata.before.id', $this->assignment->id)->assertJsonPath('history.0.metadata.after.status', 'ended');
         $this->assertSame($this->admin->id, CustomerAccountEvent::sole()->actor_id);
+        $this->assertDatabaseCount('payment_transactions', 0);
     }
 
     public function test_state_changes_require_csrf(): void
     {
         $this->app->instance('env', 'production');
-        $this->send($this->payload())->assertStatus(419);
+        $this->send($this->simple('end', ['confirm_end' => true]))->assertStatus(419);
         $this->assertDatabaseCount('customer_package_assignments', 1);
     }
 
@@ -249,35 +215,29 @@ class SubscriptionManagementTest extends TestCase
 
     public function test_renewal_access_boundary_is_automatic_and_accepts_new_work_after_start(): void
     {
-        $this->send($this->payload())->assertOk();
+        $this->assignment->update(['ends_at' => '2026-11-12 10:00:00']);
+        $this->schedule();
         $this->actingAs($this->customer, 'web');
+        $this->postJson('/media/projects', [])->assertForbidden()->assertJsonPath('code', 'subscription_unavailable');
         $this->travelTo(CarbonImmutable::parse('2026-12-12 00:00:00', 'UTC'));
         $this->postJson('/media/projects', [])->assertUnprocessable()->assertJsonValidationErrors('filename');
     }
 
-    public function test_expired_historical_period_cannot_replenish_access_over_an_existing_active_period(): void
-    {
-        $this->send($this->payload())->assertOk();
-        $this->travelTo(CarbonImmutable::parse('2026-12-13 00:00:00', 'UTC'));
-        $this->send($this->payload(['timing' => 'now', 'starts_on' => '2026-12-13', 'ends_on' => '2027-01-12', 'replace_current' => true]))->assertUnprocessable()->assertJsonValidationErrors('starts_on');
-        $this->assertDatabaseCount('customer_package_assignments', 2);
-    }
-
     public function test_scheduled_package_change_keeps_current_snapshot_and_inactive_catalog_changes_do_not_rewrite_it(): void
     {
-        $this->send($this->payload(['action' => 'change']))->assertOk();
+        $this->schedule(source: 'payment_package_change');
         $this->package->update(['status' => 'archived', 'name' => 'Archived product']);
         $this->assertSame($this->assignment->id, $this->customer->fresh()->currentPackageAssignment->id);
         $this->travelTo(CarbonImmutable::parse('2026-12-12 00:00:00', 'UTC'));
         $current = $this->customer->fresh()->currentPackageAssignment;
-        $this->assertSame('package_change', $current->source);
+        $this->assertSame('payment_package_change', $current->source);
         $this->assertNotSame('Archived product', $current->snapshot['name']);
         $this->assertTrue($current->allowance_starts_at->equalTo($current->starts_at));
     }
 
     public function test_main_list_keeps_one_customer_row_and_exposes_the_scheduled_period(): void
     {
-        $nextId = $this->send($this->payload())->assertOk()->json('id');
+        $nextId = $this->schedule()->id;
         $this->getJson('/admin/subscriptions')->assertOk()->assertJsonCount(1, 'items')
             ->assertJsonPath('pagination.total', 1)->assertJsonPath('items.0.id', $this->assignment->id)
             ->assertJsonPath('items.0.next_period.id', $nextId)->assertJsonPath('summary.upcoming', 1);
@@ -285,7 +245,7 @@ class SubscriptionManagementTest extends TestCase
         $this->travelTo(CarbonImmutable::parse('2026-12-12 00:00:00', 'UTC'));
         $this->getJson('/admin/subscriptions')->assertOk()->assertJsonCount(1, 'items')->assertJsonPath('items.0.id', $nextId)->assertJsonPath('summary.expired', 0)->assertJsonPath('summary.active', 1);
         $this->getJson('/admin/subscriptions?status=expired')->assertOk()->assertJsonCount(0, 'items');
-        $this->getJson('/admin/subscriptions/'.$nextId)->assertOk()->assertJsonCount(2, 'periods')->assertJsonCount(1, 'history');
+        $this->getJson('/admin/subscriptions/'.$nextId)->assertOk()->assertJsonCount(2, 'periods');
         $this->assertDatabaseCount('customer_package_assignments', 2);
     }
 
@@ -294,27 +254,24 @@ class SubscriptionManagementTest extends TestCase
         $initialId = $this->assignment->id;
         for ($month = 0; $month < 6; $month++) {
             $current = $this->customer->fresh()->currentPackageAssignment;
-            $nextId = $this->send($this->payload([
-                'starts_on' => $current->ends_at->toDateString(),
-                'ends_on' => $current->ends_at->addDays(30)->toDateString(),
-            ]), $current->id)->assertOk()->json('id');
+            $nextId = $this->schedule($current->ends_at->toDateTimeString(), $current->ends_at->addDays(30)->toDateTimeString(), after: $current)->id;
             $this->travelTo($current->ends_at);
             $this->getJson('/admin/subscriptions')->assertOk()->assertJsonCount(1, 'items')
                 ->assertJsonPath('items.0.id', $nextId)->assertJsonPath('pagination.total', 1)->assertJsonPath('summary.expired', 0);
         }
         $this->assertDatabaseCount('users', 2);
         $this->assertDatabaseCount('customer_package_assignments', 7);
-        $this->getJson('/admin/subscriptions/'.$nextId)->assertOk()->assertJsonCount(7, 'periods')->assertJsonCount(6, 'history');
+        $this->getJson('/admin/subscriptions/'.$nextId)->assertOk()->assertJsonCount(7, 'periods');
         $this->getJson('/admin/subscriptions?q=SUB-'.str_pad((string) $initialId, 6, '0', STR_PAD_LEFT))->assertOk()->assertJsonCount(1, 'items')->assertJsonPath('items.0.id', $nextId);
     }
 
     public function test_cancelled_future_period_stays_in_history_without_duplicating_customer(): void
     {
-        $nextId = $this->send($this->payload())->assertOk()->json('id');
+        $nextId = $this->schedule()->id;
         $this->send($this->simple('cancel'), $nextId)->assertOk();
         $this->getJson('/admin/subscriptions')->assertOk()->assertJsonCount(1, 'items')
             ->assertJsonPath('items.0.next_period', null)->assertJsonPath('summary.upcoming', 0)->assertJsonPath('items.0.status', 'active');
-        $this->getJson('/admin/subscriptions/'.$this->assignment->id)->assertOk()->assertJsonCount(2, 'periods')->assertJsonCount(2, 'history')->assertJsonPath('periods.0.status', 'cancelled');
+        $this->getJson('/admin/subscriptions/'.$this->assignment->id)->assertOk()->assertJsonCount(2, 'periods')->assertJsonCount(1, 'history')->assertJsonPath('periods.0.status', 'cancelled');
     }
 
     public function test_pagination_counts_customers_instead_of_period_history(): void

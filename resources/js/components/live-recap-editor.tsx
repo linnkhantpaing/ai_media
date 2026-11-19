@@ -13,12 +13,12 @@ import '../../css/live-recap-editor.css';
 type Props = {
     project: MediaProject; settings: MediaSettings; lines: MediaLine[]; selected: number; title: string;
     onSelect: (index: number) => void; onChange: <K extends keyof MediaSettings>(key: K, value: MediaSettings[K]) => void;
-    disabled: boolean; dirty: boolean; preview: MediaPreview | null; onPreview: () => void; canPreview: boolean;
+    disabled: boolean; dirty: boolean; preview: MediaPreview | null; onPreview: () => void; canPreview: boolean; canMoveCaption?: boolean; canMoveCover?: boolean;
     onUndo: () => void; onRedo: () => void; canUndo: boolean; canRedo: boolean; onReset: () => void;
     children: ReactNode; watchRequest?: number;
 };
 
-export function LiveRecapEditor({project, settings, lines, selected, title, onSelect, onChange, disabled, dirty, preview, onPreview, canPreview, onUndo, onRedo, canUndo, canRedo, onReset, children, watchRequest = 0}: Props) {
+export function LiveRecapEditor({project, settings, lines, selected, title, onSelect, onChange, disabled, dirty, preview, onPreview, canPreview, canMoveCaption = true, canMoveCover = true, onUndo, onRedo, canUndo, canRedo, onReset, children, watchRequest = 0}: Props) {
     const t = useRecapText();
     const {locale} = useMediaText();
     const player = useRef<HTMLVideoElement>(null), canvas = useRef<HTMLCanvasElement>(null), viewport = useRef<HTMLDivElement>(null), shell = useRef<HTMLDivElement>(null);
@@ -139,7 +139,7 @@ export function LiveRecapEditor({project, settings, lines, selected, title, onSe
         draw.current();
     }
     function beginDrag(event: PointerEvent, kind: 'caption' | 'cover') {
-        if (disabled || mode !== 'live') return;
+        if (disabled || mode !== 'live' || (kind === 'caption' ? !canMoveCaption : !canMoveCover)) return;
         event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId);
         dragOrigin.current = {y: event.clientY, value: kind === 'cover' ? settings.cover_top : settings.subtitle_position === 'top' ? settings.subtitle_lift : settings.subtitle_position === 'middle' ? .5 : 1 - settings.subtitle_lift};
         setDragging(kind);

@@ -15,7 +15,42 @@ use Illuminate\Validation\ValidationException;
 
 class PackageCatalog
 {
-    public const FEATURES = ['local', 'youtube', 'subs', 'dub', 'mp4', 'srt', 'audio', 'script_edit', 'voice_preview', 'video_preview', 'subtitle_style', 'cover_subtitles', 'layout', 'keep_background'];
+    /**
+     * Package feature keys. "movie" is Summarize a Long Movie, "dub" is Translate
+     * an Existing Recap (narrated) and "subs" is Subtitles. "srt" covers the
+     * SRT and styled ASS subtitle files.
+     */
+    public const FEATURES = ['local', 'youtube', 'movie', 'subs', 'dub', 'mp4', 'srt', 'audio', 'script_edit', 'voice_preview', 'video_preview', 'subtitle_style', 'cover_subtitles', 'layout', 'keep_background'];
+
+    /**
+     * Complete feature map for a package definition. Definitions published
+     * before the "movie" feature existed inherit it from narrated dubbing.
+     *
+     * @param  array<string, mixed>  $definition
+     * @return array<string, bool>
+     */
+    public static function features(array $definition): array
+    {
+        $stored = is_array($definition['features'] ?? null) ? $definition['features'] : [];
+        $features = array_fill_keys(self::FEATURES, false);
+        foreach (self::FEATURES as $key) {
+            $features[$key] = (bool) ($stored[$key] ?? false);
+        }
+        if (! array_key_exists('movie', $stored)) {
+            $features['movie'] = (bool) ($stored['dub'] ?? false);
+        }
+
+        return $features;
+    }
+
+    /**
+     * @param  array<string, mixed>  $definition
+     * @return array<string, mixed>
+     */
+    public static function presentDefinition(array $definition): array
+    {
+        return [...$definition, 'features' => self::features($definition)];
+    }
 
     public function uploadSizeOptions(): array
     {
@@ -39,12 +74,13 @@ class PackageCatalog
 
     public function resource(Package $package): array
     {
-        return ['id' => $package->id, 'name' => $package->name, 'code' => $package->code, 'type' => $package->type, 'status' => $package->status, 'revision' => $package->revision, 'published_version' => $package->published_version, 'definition' => $package->definition, 'assigned_users' => CustomerPackageAssignment::current()->where('package_id', $package->id)->whereHas('user', fn ($user) => $user->where('is_admin', false)->where('account_status', '!=', 'archived'))->distinct()->count('user_id'), 'created_at' => $package->created_at->toIso8601String(), 'updated_at' => $package->updated_at->toIso8601String()];
+        return ['id' => $package->id, 'name' => $package->name, 'code' => $package->code, 'type' => $package->type, 'status' => $package->status, 'revision' => $package->revision, 'published_version' => $package->published_version, 'definition' => self::presentDefinition($package->definition ?? []), 'assigned_users' => CustomerPackageAssignment::current()->where('package_id', $package->id)->whereHas('user', fn ($user) => $user->where('is_admin', false)->where('account_status', '!=', 'archived'))->distinct()->count('user_id'), 'created_at' => $package->created_at->toIso8601String(), 'updated_at' => $package->updated_at->toIso8601String()];
     }
 
     public function details(Package $package): array
     {
-        $versions = PackageVersion::where('package_id', $package->id)->leftJoin('users', 'users.id', '=', 'package_versions.actor_id')->orderByDesc('number')->get(['package_versions.id', 'number', 'definition', 'package_versions.created_at', 'users.name as actor'])->toArray();
+        $versions = PackageVersion::where('package_id', $package->id)->leftJoin('users', 'users.id', '=', 'package_versions.actor_id')->orderByDesc('number')->get(['package_versions.id', 'number', 'definition', 'package_versions.created_at', 'users.name as actor'])
+            ->map(fn (PackageVersion $version): array => [...$version->toArray(), 'definition' => self::presentDefinition($version->definition ?? [])])->all();
         $events = PackageEvent::where('package_id', $package->id)->leftJoin('users', 'users.id', '=', 'package_events.actor_id')->orderByDesc('package_events.id')->limit(100)->get(['package_events.id', 'package_events.type', 'metadata', 'package_events.created_at', 'users.name as actor'])->toArray();
 
         return ['package' => $this->resource($package), 'versions' => $versions, 'activity' => $events, 'assignment_ready' => true];
@@ -225,11 +261,11 @@ class PackageCatalog
         if ($limits['retention_enabled'] && ($definition['retention_days'] ?? 0) > $limits['retention_days']) {
             $errors['retention_days'] = 'This exceeds the system retention ceiling.';
         }
-        $f = array_replace(array_fill_keys(self::FEATURES, false), $definition['features'] ?? []);
+        $f = self::features($definition);
         if (! $f['local'] && ! $f['youtube']) {
             $errors['features.local'] = 'Enable at least one input source.';
         }
-        if (! $f['subs'] && ! $f['dub']) {
+        if (! $f['subs'] && ! $f['dub'] && ! $f['movie']) {
             $errors['features.subs'] = 'Enable at least one processing mode.';
         }
         if (! $f['mp4'] && ! $f['srt'] && ! $f['audio']) {
@@ -238,11 +274,11 @@ class PackageCatalog
         if ($f['subs'] && ! $f['mp4'] && ! $f['srt']) {
             $errors['features.srt'] = 'Subtitles mode requires MP4 or SRT export.';
         }
-        if ($f['dub'] && ! $f['mp4'] && ! $f['audio']) {
-            $errors['features.mp4'] = 'Dubbing requires MP4 or audio export.';
+        if (($f['dub'] || $f['movie']) && ! $f['mp4'] && ! $f['audio']) {
+            $errors['features.mp4'] = 'Narrated recaps require MP4 or audio export.';
         }
-        if (($f['audio'] || $f['voice_preview'] || $f['keep_background']) && ! $f['dub']) {
-            $errors['features.dub'] = 'Enable dubbing for narration audio, voice preview or background separation.';
+        if (($f['audio'] || $f['voice_preview'] || $f['keep_background']) && ! $f['dub'] && ! $f['movie']) {
+            $errors['features.dub'] = 'Enable a narrated recap mode for narration audio, voice preview or background separation.';
         }
         if ($errors) {
             throw ValidationException::withMessages($errors);

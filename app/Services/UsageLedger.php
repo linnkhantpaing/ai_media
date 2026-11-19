@@ -9,12 +9,31 @@ use App\Models\MediaRun;
 use App\Models\UsageEvent;
 use App\Models\UsageRecord;
 use App\Models\User;
+use App\Services\Media\ProjectDefaults;
+use App\Support\MediaSettings;
 use App\Support\StudioTesting;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class UsageLedger
 {
+    /**
+     * Whether the customer may start new processing right now. Managed accounts
+     * and anyone with a package need an active (not expired, ended or upcoming) period.
+     */
+    public function hasProcessingAccess(User $user): bool
+    {
+        if ($user->account_status !== 'active') {
+            return false;
+        }
+        if ($user->is_admin || StudioTesting::enabled()) {
+            return true;
+        }
+        $assignment = $user->currentPackageAssignment;
+
+        return ! (($user->managed_account || $assignment) && (! $assignment || $assignment->status() !== 'active'));
+    }
+
     public function featureErrors(MediaProject $project, array $settings, ?CustomerPackageAssignment $assignment = null): array
     {
         if (StudioTesting::enabled()) {
@@ -25,23 +44,77 @@ class UsageLedger
             return [];
         }
         $snapshot = $assignment->effectiveSnapshot();
-        $features = $snapshot['definition']['features'] ?? [];
+        $features = PackageCatalog::features($snapshot['definition'] ?? []);
+        $saved = is_array($project->settings) ? $project->settings : [];
+        $settings = [...$saved, ...$settings];
         $mode = $settings['mode'] ?? 'subs';
         $output = $settings['output'] ?? 'burn';
-        $required = ['usage' => $project->source_type === 'youtube' ? 'youtube' : 'local', 'settings.mode' => $mode,
+        $movie = ($settings['workflow'] ?? '') === 'movie';
+        $required = ['usage' => $project->source_type === 'youtube' ? 'youtube' : 'local',
+            ($movie ? 'settings.workflow' : 'settings.mode') => $movie ? 'movie' : $mode,
             'settings.output' => in_array($output, ['mp3', 'wav'], true) ? 'audio' : ($output === 'srt' ? 'srt' : 'mp4')];
         if ($mode === 'dub' && ($settings['keep_background'] ?? false) && ! (in_array($output, ['mp3', 'wav'], true) && ($settings['audio_track'] ?? 'mix') === 'narration')) {
             $required['settings.keep_background'] = 'keep_background';
         }
-        $labels = ['youtube' => 'YouTube Import', 'local' => 'Local Video', 'subs' => 'Subtitles Only', 'dub' => 'Full Burmese Dub', 'audio' => 'Audio Export', 'mp4' => 'MP4 Video', 'srt' => 'SRT Subtitles', 'keep_background' => 'Keep Music & Effects'];
+        foreach (self::CUSTOMIZATION_FEATURES as $feature => $keys) {
+            if ($this->customizes($settings, $saved, $keys, $feature)) {
+                $required['settings.'.$keys[0]] = $feature;
+            }
+        }
+        $labels = ['youtube' => 'YouTube Import', 'local' => 'Local Video', 'movie' => 'Summarize a Long Movie', 'subs' => 'Subtitles', 'dub' => 'Translate an Existing Recap', 'audio' => 'Audio Export', 'mp4' => 'MP4 Video', 'srt' => 'SRT/ASS Subtitles', 'keep_background' => 'Keep Music & Effects',
+            'subtitle_style' => 'Subtitle Styling', 'cover_subtitles' => 'Cover Original Subtitles', 'layout' => 'Aspect Ratio & Fill'];
         $errors = [];
         foreach ($required as $field => $feature) {
-            if (! ($features[$feature] ?? false)) {
-                $errors[$field] = [$snapshot['name'].' (Version '.$snapshot['version'].') does not include '.$labels[$feature].'. Contact an administrator to change this package\'s features.'];
+            if (! $features[$feature]) {
+                $errors[$field] = [$snapshot['name'].' does not include '.$labels[$feature].'. Upgrade your plan in Billing & Payments to use it.'];
             }
         }
 
         return $errors;
+    }
+
+    /**
+     * Render settings that only a package feature may change. A value is allowed
+     * without the feature when it matches the system project defaults or the
+     * value already saved on the project.
+     *
+     * @var array<string, list<string>>
+     */
+    private const CUSTOMIZATION_FEATURES = [
+        'subtitle_style' => ['subtitle_font', 'subtitle_size', 'subtitle_lift', 'subtitle_position', 'subtitle_color', 'subtitle_bold', 'subtitle_outline', 'subtitle_shadow', 'subtitle_background', 'subtitle_opacity'],
+        'cover_subtitles' => ['cover_mode', 'cover_style', 'cover_top', 'cover_height'],
+        'layout' => ['aspect', 'fill', 'quality'],
+    ];
+
+    /**
+     * @param  array<string, mixed>  $settings
+     * @param  array<string, mixed>  $saved
+     * @param  list<string>  $keys
+     */
+    private function customizes(array $settings, array $saved, array $keys, string $feature): bool
+    {
+        if ($feature === 'cover_subtitles' && ($settings['cover_mode'] ?? 'off') === 'off') {
+            return false;
+        }
+        $defaults = MediaSettings::normalize(app(ProjectDefaults::class)->resolved());
+        $current = MediaSettings::normalize($settings);
+        $previous = MediaSettings::normalize($saved);
+        foreach ($keys as $key) {
+            if (! $this->sameSetting($current[$key], $defaults[$key]) && ! $this->sameSetting($current[$key], $previous[$key])) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function sameSetting(mixed $value, mixed $expected): bool
+    {
+        if (is_float($value) || is_float($expected)) {
+            return abs((float) $value - (float) $expected) < 0.0001;
+        }
+
+        return $value === $expected;
     }
 
     public function quote(MediaProject $project): ?array

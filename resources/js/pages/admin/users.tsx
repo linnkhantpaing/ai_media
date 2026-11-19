@@ -100,7 +100,8 @@ export default function Users({accounts:initial}:{accounts:AccountList}) {
  
  const savedPackage=customer?.package?{...customer.package,id:customer.package.package_id}:null;
  useEffect(()=>{if(creating)setForm(current=>({...current,package_id:freePackage?String(freePackage.id):'',package_version:freePackage?.version??0}));},[creating,freePackage?.id,freePackage?.version]);
- const packageOptions:AccountPackageOption[]=creating?(freePackage?[freePackage]:[]):savedPackage&&!packages.some(item=>item.id===savedPackage.id&&item.version===savedPackage.version)?[savedPackage,...packages]:packages;
+ const correctablePackages=packages.filter(item=>item.type==='trial'||item.id===savedPackage?.id);
+ const packageOptions:AccountPackageOption[]=creating?(freePackage?[freePackage]:[]):savedPackage&&!correctablePackages.some(item=>item.id===savedPackage.id&&item.version===savedPackage.version)?[savedPackage,...correctablePackages]:correctablePackages;
  const chosenPackage=packageOptions.find(item=>String(item.id)===form.package_id&&item.version===form.package_version);
  const endsOn=profile&&form.validity_mode==='package'?(chosenPackage?addDateDays(form.starts_on,chosenPackage.validity_days):''):form.ends_on;
  const periodDays=dateDays(form.starts_on,endsOn);

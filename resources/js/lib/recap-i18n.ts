@@ -126,3 +126,4 @@ Object.assign(words,{
  'Audio detected':['အသံပါရှိသည်','ตรวจพบเสียง'],
  'No audio detected':['အသံမတွေ့ပါ','ไม่พบเสียง'],
 });
+Object.assign(words,{'Not included in your plan.':['သင့် Plan တွင် မပါဝင်ပါ။','ไม่รวมอยู่ในแพ็กเกจของคุณ'],'Open Billing & Payments':['Billing & Payments ဖွင့်ရန်','เปิด Billing & Payments']});

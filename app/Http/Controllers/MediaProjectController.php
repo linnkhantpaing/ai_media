@@ -21,6 +21,7 @@ use App\Services\Media\ProjectLibrary;
 use App\Services\Media\ProviderSettings;
 use App\Services\Media\StorageSettings;
 use App\Services\Media\YouTubeImports;
+use App\Services\PackageCatalog;
 use App\Services\UsageLedger;
 use App\Support\MediaSettings;
 use App\Support\StudioTesting;
@@ -85,6 +86,7 @@ class MediaProjectController extends Controller
 
     public function initialize(InitializeMediaProjectRequest $request): JsonResponse
     {
+        $this->requireFeature('local');
         try {
             $project = $this->uploads->initialize($request->user()->id, $request->validated());
         } catch (MediaFailure $failure) {
@@ -96,6 +98,7 @@ class MediaProjectController extends Controller
 
     public function importYouTube(ImportYouTubeVideoRequest $request, YouTubeImports $imports): JsonResponse
     {
+        $this->requireFeature('youtube');
         try {
             $project = $imports->initialize($request->user()->id, $request->validated());
         } catch (MediaFailure $failure) {
@@ -415,7 +418,9 @@ class MediaProjectController extends Controller
 
         return [
             'testingMode' => StudioTesting::enabled(),
-            'features' => $definition['features'] ?? null,
+            'features' => $definition === [] ? null : PackageCatalog::features($definition),
+            'planActive' => app(UsageLedger::class)->hasProcessingAccess(request()->user()),
+            'billingUrl' => route('account.billing', absolute: false),
             'studioDefaults' => MediaSettings::defaults((int) request()->user()->id),
             'dictionaryUrl' => route('media.dictionary.save', absolute: false),
             'runtime' => $this->runtime->capabilities(),
@@ -459,6 +464,18 @@ class MediaProjectController extends Controller
                 'previews' => $link('preview.create'), 'audio' => $link('file', ['kind' => 'audio']), 'video' => $link('file', ['kind' => 'video']), 'subtitles' => $link('file', ['kind' => 'subtitles']),
             ],
         ];
+    }
+
+    /** Reject starting a source type the customer's current package does not include. */
+    private function requireFeature(string $feature): void
+    {
+        if (StudioTesting::enabled()) {
+            return;
+        }
+        $assignment = request()->user()->currentPackageAssignment;
+        if ($assignment && ! PackageCatalog::features($assignment->effectiveSnapshot()['definition'] ?? [])[$feature]) {
+            $this->error('feature_unavailable', 403);
+        }
     }
 
     private function error(string $code, int $status): never

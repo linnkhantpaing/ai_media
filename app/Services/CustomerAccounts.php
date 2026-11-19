@@ -174,62 +174,6 @@ class CustomerAccounts
         return $delivery;
     }
 
-    public function upgradePackageFeatures(User $actor, int $id, int $packageId, int $versionNumber, int $revision, string $reason, string $requestId): array
-    {
-        abort_unless($actor->is_admin, 403);
-        $reason = trim($reason);
-        if ($reason === '' || mb_strlen($reason) > 500 || ! Str::isUuid($requestId)) {
-            throw ValidationException::withMessages(['reason' => 'A reason and a valid request ID are required.']);
-        }
-        $fingerprint = $this->fingerprint($actor, ['package_features', $id, $packageId, $versionNumber, $revision, $reason]);
-
-        return Cache::lock('customer:'.$id, 15)->block(5, fn (): array => DB::transaction(function () use ($actor, $id, $packageId, $versionNumber, $revision, $reason, $requestId, $fingerprint): array {
-            $user = $this->customer($id, true);
-            $prior = CustomerAccountEvent::where('operation_key', $requestId)->first();
-            if ($prior) {
-                abort_unless($prior->user_id === $id && hash_equals((string) $prior->fingerprint, $fingerprint), 409);
-
-                return ['customer' => $this->resource($user), 'replayed' => true];
-            }
-            abort_unless($user->account_revision === $revision, 409, 'This account changed. Refresh and try again.');
-            $package = Package::lockForUpdate()->findOrFail($packageId);
-            abort_unless($package->status === 'active' && (int) $package->published_version === $versionNumber, 409, 'The published package changed.');
-            $version = PackageVersion::where('package_id', $packageId)->where('number', $versionNumber)->firstOrFail();
-            $periods = CustomerPackageAssignment::standing()->where('user_id', $id)->where('package_id', $packageId)->whereNull('closed_kind')->where('ends_at', '>', now())->lockForUpdate()->get();
-            abort_if($periods->isEmpty(), 409, 'No current or upcoming period uses this package.');
-            $changes = [];
-            foreach ($periods as $period) {
-                $old = $period->snapshot['definition'];
-                $new = $version->definition;
-                if (array_diff_key($old, ['features' => true]) !== array_diff_key($new, ['features' => true])) {
-                    throw ValidationException::withMessages(['package_version' => 'Only feature additions can be applied here. Prices and allowance terms must be identical.']);
-                }
-                foreach ($old['features'] ?? [] as $key => $enabled) {
-                    if ($enabled && ! ($new['features'][$key] ?? false)) {
-                        throw ValidationException::withMessages(['package_version' => 'This update removes an existing feature. Review the package assignment instead.']);
-                    }
-                }
-                if ((int) $period->snapshot['version'] === $versionNumber && $old === $new) {
-                    continue;
-                }
-                $before = $this->assignmentAudit($period);
-                $snapshot = $period->snapshot;
-                $snapshot['version'] = $versionNumber;
-                $snapshot['definition'] = $new;
-                $period->forceFill(['package_version_id' => $version->id, 'snapshot' => $snapshot])->save();
-                $changes[] = ['before' => $before, 'after' => $this->assignmentAudit($period)];
-            }
-            if ($changes !== []) {
-                $user->account_revision++;
-                $user->save();
-                $this->event($user, $actor, 'edit', ['fields' => ['package_features'], 'reason' => $reason, 'package_change' => $changes[0], 'feature_version_changes' => $changes], $requestId, $fingerprint);
-            }
-            $user->unsetRelation('currentPackageAssignment');
-
-            return ['customer' => $this->resource($user), 'replayed' => false, 'updated_periods' => count($changes)];
-        }));
-    }
-
     public function mutate(User $actor, int $id, array $data, string $action): array
     {
         $fingerprint = $this->fingerprint($actor, [$action, $id, $data]);
@@ -251,6 +195,7 @@ class CustomerAccounts
                 if (isset($data['package_id'])) {
                     $current = $user->currentPackageAssignment()->lockForUpdate()->first();
                     if (! $current || ! $this->assignmentMatches($current, $data)) {
+                        $this->assertCorrectionPackageAllowed($current, (int) $data['package_id']);
                         abort_if(CustomerPackageAssignment::standing()->where('user_id', $user->id)->whereNull('closed_kind')->where('starts_at', '>', now())->when($current, fn ($query) => $query->where('id', '!=', $current->id))->exists(), 409, 'A scheduled period exists. Manage it in Subscriptions before correcting this assignment.');
                         $assignmentData = $this->prepareAssignment($data, $current);
                         $assignment = CustomerPackageAssignment::create([...$assignmentData, 'user_id' => $user->id, 'assigned_by' => $actor->id, 'source' => 'account_correction', 'supersedes_id' => $current?->id, 'allowance_starts_at' => $current?->allowance_starts_at ?? $current?->starts_at]);
@@ -286,6 +231,21 @@ class CustomerAccounts
 
             return ['customer' => $this->resource($user->refresh()), 'replayed' => false];
         }));
+    }
+
+    /**
+     * Account corrections may fix the dates of the customer's current package or
+     * move them to a free trial. Granting a different paid package requires an
+     * approved payment, so it is refused here.
+     */
+    private function assertCorrectionPackageAllowed(?CustomerPackageAssignment $current, int $packageId): void
+    {
+        if ($current && $current->package_id === $packageId) {
+            return;
+        }
+        if (Package::whereKey($packageId)->value('type') !== 'trial') {
+            throw ValidationException::withMessages(['package_id' => 'Paid packages are granted only by approving a payment. Use Payments to activate or change a paid package.']);
+        }
     }
 
     private function prepareAssignment(array $data, ?CustomerPackageAssignment $current = null): array
