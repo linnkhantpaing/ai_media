@@ -1134,3 +1134,9 @@ Supersedes the "Legacy implementation caveat" in section 8 and the "re-enable pa
 - Forgot password and Reset password now use `CinematicLoginLayout` (same film-ribbon background, compact card, language switcher) with a page badge (key "Reset Password" / lock "New Password"). The old `layouts/auth-layout.tsx` (separate title, description and "Private workspace" footer) was removed.
 - Forgot: email + Send reset link + Back to sign in; the sent notice is a compact mint box. Reset: the email from the link is read-only (editable again if the server rejects it), new + confirm password, and five live rule chips (12+, Aa, 0-9, !@#, match) replace the long policy sentence. Server rules (`Password::defaults`) are unchanged.
 - Browser QA (isolated SQLite): en/my/th at 1440x900, 1366x657, 390x844 and 360x640 - no vertical or horizontal scroll in sign-in, forgot, sent, reset and reset-error states.
+
+### Premium account emails - 2026-11-19
+
+- The only two outgoing emails (password reset from Forgot password, and the admin-created account welcome / resend login information) now share one premium dark template: `App\Support\BrandedMail` + `resources/views/mail/branded.blade.php` (HTML) and `branded-text.blade.php` (plain text). Text lives in `lang/{en,my,th}/mail.php` and follows the customer's `preferred_locale`.
+- The ZATLAN logo (`resources/mail/zatlan-logo.png`, 480px copy of the brand logo) is embedded inline (CID attachment), so it shows even when `APP_URL` is local. The admin-uploaded General Settings logo is not used in email yet; name, tagline and support email/URL do come from General Settings.
+- Reset uses `ResetPassword::toMailUsing` (same class and URL builder, so existing tests and the 60-minute expiry are unchanged). Welcome keeps the `platform` mailer. Test: `BrandedMailTest`.

@@ -18,6 +18,7 @@ use App\Services\AuditTrail;
 use App\Services\CustomerNotifications;
 use App\Services\Media\ProviderSettings;
 use App\Services\Media\StorageSettings;
+use App\Support\BrandedMail;
 use Illuminate\Auth\Events\Failed;
 use Illuminate\Auth\Events\Lockout;
 use Illuminate\Auth\Events\Login;
@@ -93,10 +94,13 @@ class AppServiceProvider extends ServiceProvider
 
         Password::defaults(fn () => Password::min(12)->mixedCase()->numbers()->symbols());
 
-        ResetPassword::createUrlUsing(fn (User $user, string $token): string => rtrim(config('app.url'), '/').route('password.reset', [
+        $resetUrl = fn (User $user, string $token): string => rtrim(config('app.url'), '/').route('password.reset', [
             'token' => $token, 'email' => $user->getEmailForPasswordReset(),
-        ], absolute: false)
-        );
+        ], absolute: false);
+        ResetPassword::createUrlUsing($resetUrl);
+        ResetPassword::toMailUsing(fn (User $user, string $token) => BrandedMail::reset(
+            $user, $resetUrl($user, $token), (int) config('auth.passwords.'.config('auth.defaults.passwords').'.expire', 60)
+        ));
 
         if ($this->app->isProduction()) {
             URL::forceScheme('https');
