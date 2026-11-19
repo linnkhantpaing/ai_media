@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Support\NameDictionary;
 use Illuminate\Foundation\Http\FormRequest;
 
 class SaveNameDictionaryRequest extends FormRequest
@@ -15,11 +16,7 @@ class SaveNameDictionaryRequest extends FormRequest
     {
         return [
             'project_id' => ['sometimes', 'nullable', 'uuid'],
-            'name_dictionary' => ['present', 'array', 'max:50'],
-            'name_dictionary.*' => ['array:original,translated,pronunciation'],
-            'name_dictionary.*.original' => ['required', 'string', 'max:100'],
-            'name_dictionary.*.translated' => ['required', 'string', 'max:100'],
-            'name_dictionary.*.pronunciation' => ['nullable', 'string', 'max:100'],
+            ...NameDictionary::rules(),
         ];
     }
 }

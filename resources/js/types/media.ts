@@ -1,4 +1,4 @@
-export interface NameDictionaryEntry { original: string; translated: string; pronunciation?: string }
+export interface NameDictionaryEntry { original: string; translated: string; pronunciation?: string; type?: 'character'|'place'|'term'|'other'; language?: string; note?: string }
 export interface MediaSettings {
     fit_script_to_speed?:boolean; workflow?:'movie'|'translate'|'subtitles'; narration_lang?:string; subtitle_lang?:string; target_seconds?:number;
     narration_style?:string; story_order?:string; spoilers?:string; custom_style?:string; character_focus?:string; instructions?:string;
@@ -25,7 +25,7 @@ export interface MediaProject {
     links: Record<'scenes' | 'styledSubtitles' | 'status' | 'upload' | 'complete' | 'update' | 'destroy' | 'uploadPage' | 'setup' | 'analysis' | 'start' | 'generate' | 'script' | 'retry' | 'cancel' | 'reopen' | 'importRetry' | 'importCancel' | 'source' | 'poster' | 'video' | 'audio' | 'previews' | 'subtitles', string>;
 }
 export interface MediaPageProps {
-    testingMode?:boolean; features?:Record<string,boolean>|null; planActive?:boolean; billingUrl?:string; studioDefaults?:MediaSettings; initialProject: MediaProject | null; recentProjects?: MediaProject[];
+    testingMode?:boolean; features?:Record<string,boolean>|null; planActive?:boolean; billingUrl?:string; personalDefaults?:Partial<MediaSettings>; startPreset?:{id:number;name:string}|null; studioDefaults?:MediaSettings; initialProject: MediaProject | null; recentProjects?: MediaProject[];
     runtime: { mediaReady: boolean; aiReady: boolean; backgroundSeparation: boolean; voices: string[]; youtubeReady: boolean };
     limits: { bytes: number; duration: number; chunkBytes: number };
     storage: { disk: string; ready: boolean; used: number; limit: number };

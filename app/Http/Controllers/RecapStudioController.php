@@ -6,6 +6,7 @@ use App\Http\Requests\SaveNameDictionaryRequest;
 use App\Http\Requests\SaveRecapScenesRequest;
 use App\Models\MediaProject;
 use App\Models\User;
+use App\Support\NameDictionary;
 use App\Support\StudioTesting;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\JsonResponse;
@@ -17,11 +18,7 @@ class RecapStudioController extends Controller
 {
     public function dictionary(SaveNameDictionaryRequest $request): JsonResponse
     {
-        $dictionary = array_map(fn (array $entry): array => [
-            'original' => trim($entry['original']),
-            'translated' => trim($entry['translated']),
-            'pronunciation' => trim((string) ($entry['pronunciation'] ?? '')),
-        ], array_values($request->validated('name_dictionary')));
+        $dictionary = NameDictionary::normalize($request->validated('name_dictionary'));
 
         DB::transaction(function () use ($request, $dictionary): void {
             $projectId = $request->validated('project_id');

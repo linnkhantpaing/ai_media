@@ -10,6 +10,7 @@ use App\Http\Requests\UpdateMediaSettingsRequest;
 use App\Jobs\ImportYouTubeVideo;
 use App\Jobs\InspectMediaProject;
 use App\Jobs\ProcessMediaRun;
+use App\Models\MediaPreset;
 use App\Models\MediaProject;
 use App\Models\MediaRun;
 use App\Services\Media\MediaNarrationFit;
@@ -22,6 +23,7 @@ use App\Services\Media\ProviderSettings;
 use App\Services\Media\StorageSettings;
 use App\Services\Media\YouTubeImports;
 use App\Services\PackageCatalog;
+use App\Services\StudioPreferences;
 use App\Services\UsageLedger;
 use App\Support\MediaSettings;
 use App\Support\StudioTesting;
@@ -76,11 +78,14 @@ class MediaProjectController extends Controller
     public function create(Request $request): Response
     {
         $recent = MediaProject::where('user_id', $request->user()->id)->latest('updated_at')->limit(8)->get();
+        $presetId = $request->query('preset');
+        $preset = is_string($presetId) && ctype_digit($presetId) ? MediaPreset::where('user_id', $request->user()->id)->find((int) $presetId) : null;
 
         return Inertia::render('projects/create', [
             'frame' => 'newProject', 'initialProject' => null,
             'recentProjects' => $recent->map(fn (MediaProject $project) => $this->data($project)),
-            ...$this->common(),
+            ...$this->common($preset),
+            'startPreset' => $preset ? ['id' => $preset->id, 'name' => $preset->name] : null,
         ]);
     }
 
@@ -410,7 +415,7 @@ class MediaProjectController extends Controller
         }
     }
 
-    private function common(): array
+    private function common(?MediaPreset $preset = null): array
     {
         $assignment = request()->user()?->currentPackageAssignment;
         $definition = StudioTesting::enabled() ? [] : ($assignment?->effectiveSnapshot()['definition'] ?? []);
@@ -422,6 +427,7 @@ class MediaProjectController extends Controller
             'planActive' => app(UsageLedger::class)->hasProcessingAccess(request()->user()),
             'billingUrl' => route('account.billing', absolute: false),
             'studioDefaults' => MediaSettings::defaults((int) request()->user()->id),
+            'personalDefaults' => app(StudioPreferences::class)->overrides(request()->user(), $preset),
             'dictionaryUrl' => route('media.dictionary.save', absolute: false),
             'runtime' => $this->runtime->capabilities(),
             'presetsUrl' => route('media.presets', absolute: false),

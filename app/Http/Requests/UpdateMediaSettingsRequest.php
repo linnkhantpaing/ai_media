@@ -6,6 +6,7 @@ use App\Models\MediaProject;
 use App\Services\Media\MediaBackground;
 use App\Services\UsageLedger;
 use App\Support\MediaSettings;
+use App\Support\NameDictionary;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -39,11 +40,7 @@ class UpdateMediaSettingsRequest extends FormRequest
             'settings.custom_style' => ['required_if:settings.narration_style,custom', 'nullable', 'string', 'max:1000'],
             'settings.character_focus' => ['required_if:settings.story_order,character', 'nullable', 'string', 'max:200'],
             'settings.instructions' => ['sometimes', 'nullable', 'string', 'max:2000'],
-            'settings.name_dictionary' => ['sometimes', 'array', 'max:50'],
-            'settings.name_dictionary.*' => ['array:original,translated,pronunciation'],
-            'settings.name_dictionary.*.original' => ['required', 'string', 'max:100'],
-            'settings.name_dictionary.*.translated' => ['required', 'string', 'max:100'],
-            'settings.name_dictionary.*.pronunciation' => ['nullable', 'string', 'max:100'],
+            ...NameDictionary::rules('settings.name_dictionary', false),
             'settings.voice_delivery' => ['sometimes', Rule::in(['natural', 'calm', 'storyteller', 'dramatic', 'energetic', 'serious', 'warm', 'custom'])],
             'settings.voice_pitch' => ['sometimes', 'numeric', 'between:-4,4'],
             'settings.subtitle_font' => ['sometimes', Rule::in(['Padauk', 'Arial', 'Tahoma'])],

@@ -8,11 +8,11 @@ use App\Http\Controllers\CustomerBillingController;
 use App\Http\Controllers\CustomerPlanController;
 use App\Http\Controllers\CustomerQueueController;
 use App\Http\Controllers\CustomerSupportController;
-use App\Http\Controllers\FrameController;
 use App\Http\Controllers\LocaleController;
 use App\Http\Controllers\MediaProjectController;
 use App\Http\Controllers\MediaToolsController;
 use App\Http\Controllers\OperationsController;
+use App\Http\Controllers\PreferencesController;
 use App\Http\Controllers\RecapStudioController;
 use App\Http\Middleware\EnsureCustomerAccess;
 use App\Http\Middleware\EnsurePlatformAvailable;
@@ -103,7 +103,17 @@ Route::middleware(['auth:web', EnsureCustomerAccess::class, 'auth.session', Ensu
         });
     });
 
-    Route::get('/settings/preferences', [FrameController::class, 'show'])->defaults('frame', 'preferences')->name('settings.preferences');
+    Route::get('/settings/preferences', [PreferencesController::class, 'show'])->name('settings.preferences');
+    Route::prefix('settings/preferences')->name('settings.preferences.')->controller(PreferencesController::class)->group(function (): void {
+        Route::put('/', 'save')->middleware('throttle:30,1')->name('save');
+        Route::get('/voice-sample', 'voiceSample')->middleware('throttle:media-previews')->name('voice-sample');
+        Route::post('/presets', 'storePreset')->middleware('throttle:30,1')->name('presets.store');
+        Route::put('/presets/order', 'orderPresets')->middleware('throttle:60,1')->name('presets.order');
+        Route::put('/presets/default', 'defaultPreset')->middleware('throttle:60,1')->name('presets.default');
+        Route::put('/presets/{preset}', 'updatePreset')->whereNumber('preset')->middleware('throttle:30,1')->name('presets.update');
+        Route::post('/presets/{preset}/duplicate', 'duplicatePreset')->whereNumber('preset')->middleware('throttle:30,1')->name('presets.duplicate');
+        Route::delete('/presets/{preset}', 'destroyPreset')->whereNumber('preset')->middleware('throttle:30,1')->name('presets.destroy');
+    });
     Route::middleware('can:manage-system')->group(function (): void {
         Route::get('/operations/jobs', [OperationsController::class, 'index'])->name('operations.jobs');
         Route::get('/operations/workers', [OperationsController::class, 'workers'])->name('operations.workers');

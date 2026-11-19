@@ -127,3 +127,4 @@ Object.assign(words,{
  'No audio detected':['အသံမတွေ့ပါ','ไม่พบเสียง'],
 });
 Object.assign(words,{'Not included in your plan.':['သင့် Plan တွင် မပါဝင်ပါ။','ไม่รวมอยู่ในแพ็กเกจของคุณ'],'Open Billing & Payments':['Billing & Payments ဖွင့်ရန်','เปิด Billing & Payments']});
+Object.assign(words,{'Starting with your preset':['သင့် Preset ဖြင့် စတင်နေသည်','เริ่มด้วยพรีเซ็ตของคุณ']});

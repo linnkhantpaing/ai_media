@@ -43,7 +43,7 @@ class FrameNavigationTest extends TestCase
         }
         foreach ($destinations as $url => $frame) {
             $this->get($url)->assertOk()->assertInertia(fn (Assert $page) => $page
-                ->component(str_starts_with($url, '/projects') ? 'projects/index' : (str_starts_with($url, '/operations') ? ($frame === 'jobMonitor' ? 'operations/jobs' : 'operations/workers') : ($frame === 'apiKeysModels' ? 'settings/providers' : ($frame === 'projectDefaults' ? 'settings/defaults' : ($frame === 'storageRetention' ? 'settings/storage' : 'frame')))))->where('frame', $frame));
+                ->component(str_starts_with($url, '/projects') ? 'projects/index' : (str_starts_with($url, '/operations') ? ($frame === 'jobMonitor' ? 'operations/jobs' : 'operations/workers') : ($frame === 'apiKeysModels' ? 'settings/providers' : ($frame === 'projectDefaults' ? 'settings/defaults' : ($frame === 'storageRetention' ? 'settings/storage' : ($frame === 'preferences' ? 'settings/preferences' : 'frame'))))))->where('frame', $frame));
         }
     }
 

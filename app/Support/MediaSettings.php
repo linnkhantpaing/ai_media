@@ -4,6 +4,7 @@ namespace App\Support;
 
 use App\Models\User;
 use App\Services\Media\ProjectDefaults;
+use App\Services\StudioPreferences;
 
 final class MediaSettings
 {
@@ -39,7 +40,9 @@ final class MediaSettings
     {
         $settings = app(ProjectDefaults::class)->resolved();
         if ($userId !== null) {
-            $settings['name_dictionary'] = User::findOrFail($userId)->recap_name_dictionary ?? [];
+            $user = User::findOrFail($userId);
+            $settings = self::normalize(array_replace($settings, app(StudioPreferences::class)->overrides($user)));
+            $settings['name_dictionary'] = $user->recap_name_dictionary ?? [];
         }
 
         return $settings;
