@@ -19,7 +19,7 @@ class PackageController extends Controller
 {
     public function index(Request $request, PackageCatalog $catalog): Response|JsonResponse
     {
-        $filters = $request->validate(['q' => ['nullable', 'string', 'max:100'], 'type' => ['nullable', Rule::in(['paid', 'trial'])], 'status' => ['nullable', Rule::in(['draft', 'active', 'inactive', 'archived'])], 'sort' => ['nullable', Rule::in(['newest', 'name', 'updated'])], 'page' => ['nullable', 'integer', 'min:1'], 'per_page' => ['nullable', 'integer', Rule::in([10, 20, 50])]]);
+        $filters = $request->validate(['q' => ['nullable', 'string', 'max:100'], 'type' => ['nullable', Rule::in(['paid', 'trial', 'topup'])], 'status' => ['nullable', Rule::in(['draft', 'active', 'inactive', 'archived'])], 'sort' => ['nullable', Rule::in(['newest', 'name', 'updated'])], 'page' => ['nullable', 'integer', 'min:1'], 'per_page' => ['nullable', 'integer', Rule::in([10, 20, 50])]]);
         $query = Package::query();
         $status = $filters['status'] ?? '';
         if ($status) {

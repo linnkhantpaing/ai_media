@@ -128,3 +128,17 @@ Object.assign(words,{
 });
 Object.assign(words,{'Not included in your plan.':['သင့် Plan တွင် မပါဝင်ပါ။','ไม่รวมอยู่ในแพ็กเกจของคุณ'],'Open Billing & Payments':['Billing & Payments ဖွင့်ရန်','เปิด Billing & Payments']});
 Object.assign(words,{'Starting with your preset':['သင့် Preset ဖြင့် စတင်နေသည်','เริ่มด้วยพรีเซ็ตของคุณ']});
+Object.assign(words,{
+ 'PRO':['PRO','PRO'],
+ 'is not included in your plan':['သည် သင့် Plan တွင် မပါဝင်ပါ','ไม่รวมอยู่ในแพ็กเกจของคุณ'],
+ 'Upgrade your plan to unlock this workflow and create without limits.':['ဤ workflow ကို သုံးရန် Plan ကို Upgrade လုပ်ပါ။','อัปเกรดแพ็กเกจเพื่อปลดล็อกเวิร์กโฟลว์นี้'],
+ 'Upgrade your plan for longer recaps.':['Recap ပိုရှည်ရှည် ထုတ်ရန် Plan ကို Upgrade လုပ်ပါ။','อัปเกรดแพ็กเกจเพื่อสรุปที่ยาวขึ้น'],
+ 'This recap length is not included in your plan':['ဤ Recap အရှည်သည် သင့် Plan တွင် မပါဝင်ပါ','ความยาวสรุปนี้ไม่รวมอยู่ในแพ็กเกจของคุณ'],
+ 'View plans':['Plan များ ကြည့်ရန်','ดูแพ็กเกจ'],
+ 'Not now':['နောက်မှ','ไว้ทีหลัง'],
+ 'min left this period':['မိနစ် ဤသက်တမ်းအတွက် ကျန်သည်','นาทีคงเหลือในรอบนี้'],
+ 'Buy minutes':['မိနစ် ထပ်ဝယ်ရန်','ซื้อนาทีเพิ่ม'],
+ 'Videos up to':['ဗီဒီယို အများဆုံး','วิดีโอสูงสุด'],
+ 'Videos on your plan include the ZATLAN watermark.':['သင့် Plan ဖြင့် ထုတ်သော ဗီဒီယိုများတွင် ZATLAN watermark ပါပါမည်။','วิดีโอในแพ็กเกจของคุณมีลายน้ำ ZATLAN'],
+ 'Upgrade to remove it':['ဖယ်ရှားရန် Upgrade လုပ်ပါ','อัปเกรดเพื่อเอาออก'],
+});

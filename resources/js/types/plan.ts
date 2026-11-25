@@ -1,9 +1,11 @@
+export type PlanWorkflow={access:'included'|'locked'|'hidden';minutes:number|null;max_video_seconds:number|null;max_target_seconds:number|null;credits:number;total:number|null;used:number;reserved:number;available:number|null};
 export type PlanMetric={total:number|null;used:number;reserved:number;available:number|null;exceeded:number};
 export type PersonalPackage={id?:number;name:string;code?:string;version:number;type:string};
 export type PlanOverview={
  package:PersonalPackage|null;status:string;expiring:boolean;start:string|null;end:string|null;days_left:number;
  next:{package:PersonalPackage;start:string;end:string}|null;pending_payment:boolean;testing:boolean;updated_at:string;
  processing:PlanMetric;videos:PlanMetric;storage:PlanMetric;features:Record<string,boolean>;
+ workflows:Record<'movie'|'translate'|'subtitles',PlanWorkflow>|null;credits:number;watermark:boolean;
  jobs:{running:number;queued:number;concurrency:number|null;queue_limit:number|null};
  limits:{duration:number|null;upload:number|null;retention_days:number|null;cleanup_enabled:boolean};
 };

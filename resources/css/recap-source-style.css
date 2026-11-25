@@ -118,3 +118,27 @@
 .source-transfer-file{display:flex;align-items:center;gap:11px;min-width:0}.source-transfer-icon{display:grid;place-items:center;width:43px;height:43px;flex-shrink:0;border-radius:13px;background:color-mix(in srgb,var(--primary) 14%,transparent);color:var(--primary)}.source-transfer-icon svg{width:23px;height:23px}.source-transfer-file>div{display:flex;flex-direction:column;gap:4px;min-width:0}.source-transfer-file strong{font-size:11px;font-weight:650;line-height:1.7;overflow-wrap:anywhere}.source-transfer-file small{font-size:9px;color:var(--text-muted)}
 .recap-studio .source-upload-state .recap-work-progress{margin:0}.source-upload-state .recap-work-heading strong{font-size:10px}.source-upload-state .recap-work-heading b{font-variant-numeric:tabular-nums}
 @media(max-width:650px){.recap-studio .source-upload-state{min-height:185px;padding:20px 13px;gap:17px}}
+/* Plan access: locked workflows and recap lengths, remaining minutes */
+.source-output-choices button.is-locked{opacity:.78}
+.source-output-choices button.is-locked>svg:first-child,.source-output-choices button.is-locked>strong{opacity:.7}
+.source-output-choices button.is-locked:hover{opacity:1}
+.source-pro-badge{position:absolute;right:10px;top:9px;display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:20px;font-size:9px;font-weight:800;letter-spacing:.4px;color:#1A1300;background:linear-gradient(135deg,#F5C66A,#E6A23C);box-shadow:0 2px 8px #E6A23C40}
+.source-pro-badge svg{width:9px;height:9px}
+.source-duration-choices button.is-locked{display:inline-flex;align-items:center;gap:4px;opacity:.55}
+.source-duration-choices button.is-locked svg{width:10px;height:10px;color:#E6A23C}
+.source-next-row{align-items:center;gap:14px;flex-wrap:wrap}
+.source-minutes-left{display:inline-flex;align-items:center;flex-wrap:wrap;gap:4px 6px;margin-right:auto;font-size:10.5px;color:var(--text-secondary)}
+.source-minutes-left svg{width:13px;height:13px;color:var(--mint)}
+.source-minutes-left strong{color:var(--text);font-size:12px}
+.source-minutes-left em{font-style:normal;color:var(--text-muted)}
+.source-minutes-left .recap-plan-link{margin-left:4px}
+.recap-watermark-note{display:flex;align-items:center;flex-wrap:wrap;gap:6px 8px;margin:10px 0 0;font-size:10.5px;color:var(--text-secondary)}
+.recap-watermark-note svg{width:13px;height:13px;color:var(--primary)}
+.recap-upsell-dialog .recap-upsell-text{margin:0 0 16px;font-size:12px;line-height:1.8;color:var(--text-secondary)}
+.recap-upsell-dialog .media-actions .media-button svg{width:14px;height:14px}
+.processing-allowance-notice.is-short{border-color:color-mix(in srgb,var(--warning) 40%,var(--border));background:color-mix(in srgb,var(--warning) 7%,var(--surface))}
+.processing-allowance-notice.is-short>svg{color:var(--warning)}
+.processing-allowance-notice>div{display:grid;gap:2px}
+.processing-allowance-buy{display:inline-flex;align-items:center;gap:5px;margin-top:4px;color:var(--primary);font-weight:700;font-size:11px;text-decoration:none}
+.processing-allowance-buy svg{width:12px;height:12px}
+@media(max-width:600px){.source-minutes-left{width:100%;margin-right:0}.source-next-row>button{margin-left:auto}}

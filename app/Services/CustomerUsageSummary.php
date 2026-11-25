@@ -108,6 +108,7 @@ class CustomerUsageSummary
         $usedStorage = $ledger->storageBytes($user->id);
         $allocatedStorage = $ledger->allocatedStorage($user->id);
         $seconds = $definition['included_seconds'] ?? (isset($definition['included_minutes']) ? (int) ($definition['included_minutes'] * 60) : null);
+        $seconds = $seconds === null || ! $assignment ? $seconds : $seconds + $ledger->credits($user->id, $anchor);
         $videos = $definition['video_limit'] ?? null;
         $storage = $definition['storage_bytes'] ?? null;
         $accessible = ! $assignment || ($assignment->status() === 'active' && $user->account_status === 'active');

@@ -157,3 +157,48 @@
 @media(prefers-reduced-motion:reduce) { .package-type-choices button,.package-status-toggle input::after { transition:none; } }.package-related-warning { display:flex; align-items:flex-start; gap:7px; margin:12px 0 0; padding:10px 12px; border:1px solid color-mix(in srgb,var(--warning) 28%,var(--border)); border-radius:9px; background:color-mix(in srgb,var(--warning) 6%,var(--surface)); color:var(--warning); font-size:10px; line-height:1.9; }
 .package-related-warning svg { width:15px; height:15px; margin-top:2px; flex-shrink:0; }
 #package-max_upload_mib .media-select-trigger { min-height:40px; padding:8px 10px; }
+/* Top-up packages and per-workflow plan rules */
+.package-mark.is-topup { color:var(--mint); background:linear-gradient(145deg,color-mix(in srgb,var(--mint) 22%,var(--surface)),var(--surface-elevated)); border-color:color-mix(in srgb,var(--mint) 18%,transparent); }
+.package-type.is-topup { color:var(--warning); border-color:color-mix(in srgb,var(--warning) 22%,transparent); background:color-mix(in srgb,var(--warning) 11%,transparent); }
+.package-type-choices button:disabled { opacity:.45; cursor:not-allowed; }
+.package-readonly-total { border-style:dashed; background:color-mix(in srgb,var(--input) 60%,transparent); }
+.package-readonly-total strong { flex:1; height:38px; display:flex; align-items:center; font-size:12px; font-weight:700; color:var(--text); }
+.package-access { display:flex; gap:4px; padding:3px; border-radius:11px; background:var(--input); border:1px solid var(--border); }
+.package-access button { flex:1; min-width:0; display:inline-flex; align-items:center; justify-content:center; gap:5px; min-height:30px; padding:5px 8px; border:0; border-radius:8px; background:transparent; color:var(--text-secondary); font-size:10px; font-weight:650; white-space:nowrap; cursor:pointer; transition:background 160ms,color 160ms; }
+.package-access button svg { width:12px; height:12px; flex-shrink:0; }
+.package-access button:hover { color:var(--text); }
+.package-access button.is-selected { color:var(--text-inverse); background:var(--brand-gradient); box-shadow:0 2px 8px color-mix(in srgb,var(--primary) 18%,transparent); }
+.package-access button.is-selected.is-locked { color:#1A1300; background:linear-gradient(135deg,#F5C66A,#E6A23C); }
+.package-access button.is-selected.is-hidden { color:var(--text); background:var(--surface-elevated); box-shadow:none; }
+.package-access.is-wide button { min-height:38px; font-size:11px; }
+.package-access.is-wide button svg { width:15px; height:15px; color:inherit; }
+.package-workflow-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; margin-top:10px; }
+.package-workflow-card { display:flex; flex-direction:column; gap:11px; min-width:0; padding:13px; border-radius:14px; background:color-mix(in srgb,var(--surface-elevated) 70%,transparent); border:1px solid color-mix(in srgb,var(--primary) 14%,var(--border)); box-shadow:0 6px 18px #00000022, inset 0 1px 0 #FFFFFF08; }
+.package-workflow-card.is-locked { border-color:color-mix(in srgb,var(--warning) 26%,var(--border)); }
+.package-workflow-card.is-hidden { opacity:.72; border-style:dashed; }
+.package-workflow-card>header { display:flex; align-items:center; gap:9px; min-width:0; }
+.package-workflow-card>header strong { font-size:11px; line-height:1.6; min-width:0; }
+.package-workflow-icon { width:30px; height:30px; border-radius:9px; display:grid; place-items:center; flex-shrink:0; color:var(--primary); background:color-mix(in srgb,var(--primary) 13%,transparent); }
+.package-workflow-icon svg { width:16px; height:16px; }
+.package-workflow-fields { display:grid; gap:9px; }
+.package-workflow-fields .accounts-field label { font-size:10px; }
+.package-workflow-note { display:flex; align-items:flex-start; gap:7px; margin:0; color:var(--text-secondary); font-size:10px; line-height:1.8; }
+.package-workflow-note svg { width:13px; height:13px; flex-shrink:0; margin-top:3px; color:var(--warning); }
+.package-workflow-card.is-hidden .package-workflow-note svg { color:var(--text-muted); }
+.package-watermark-toggle { display:flex; align-items:center; gap:12px; margin-top:14px; padding:11px 13px; border-radius:12px; background:var(--input); border:1px solid var(--border); cursor:pointer; }
+.package-watermark-toggle.is-enabled { border-color:color-mix(in srgb,var(--primary) 35%,var(--border)); background:color-mix(in srgb,var(--primary) 6%,var(--input)); }
+.package-watermark-toggle>span { display:grid; gap:2px; min-width:0; }
+.package-watermark-toggle strong { font-size:11px; }
+.package-watermark-toggle small { color:var(--text-secondary); font-size:10px; line-height:1.7; }
+.package-watermark-toggle input { appearance:none; position:relative; width:40px; height:23px; border-radius:16px; flex-shrink:0; background:var(--surface-elevated); border:1px solid var(--border); margin:0; cursor:pointer; }
+.package-watermark-toggle input::after { content:''; position:absolute; width:17px; height:17px; border-radius:50%; background:var(--text-muted); top:2px; left:2px; transition:transform 160ms; }
+.package-watermark-toggle input:checked { background:var(--brand-gradient); border-color:var(--primary); }
+.package-watermark-toggle input:checked::after { transform:translateX(17px); background:#fff; }
+.package-watermark-toggle input:focus-visible { box-shadow:0 0 0 3px var(--focus); }
+.package-topup-section .accounts-field + .accounts-field { margin-top:12px; }
+.package-topup-minutes { max-width:260px; }
+@media (max-width:900px) { .package-workflow-grid { grid-template-columns:1fr; } }
+@media (max-width:480px) { .package-access button { padding:5px 4px; font-size:9px; } .package-access.is-wide { flex-direction:column; } }
+.package-editor-dialog .package-workflow-card>header{justify-content:flex-start;padding:0;border:0;background:none;min-height:0;position:static}.package-editor-dialog .package-workflow-card>header strong{text-align:left}
+.package-type-choices{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.package-type-choices button{position:relative;flex-direction:column;gap:4px;min-height:58px;padding:9px 6px;line-height:1.45;text-align:center;overflow-wrap:anywhere}.package-type-choices button>svg:last-child:not(:first-child){position:absolute;top:6px;right:6px;width:12px;height:12px}
+.package-type-choices{align-items:stretch}

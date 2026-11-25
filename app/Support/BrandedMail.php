@@ -57,7 +57,7 @@ class BrandedMail
             'supportHref' => $brand['support_email'] ? 'mailto:'.$brand['support_email'] : ($brand['support_url'] ?: null),
             'automated' => $text('automated'),
             'rights' => $text('rights'),
-            'logoPath' => resource_path('mail/zatlan-logo.png'),
+            'logoPath' => resource_path('brand/zatlan-logo.png'),
         ];
 
         $mail = (new MailMessage)

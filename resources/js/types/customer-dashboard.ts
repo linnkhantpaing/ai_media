@@ -9,7 +9,7 @@ export type DashboardPlan={
  next:{package:{name:string};start:string;end:string}|null;
  pending_payment:boolean;processing:DashboardMetric;videos:DashboardMetric;storage:DashboardMetric;
  jobs:{running:number;queued:number};testing:boolean;
- workflows:Record<DashboardWorkflow,boolean>;preset:{id:number;name:string}|null;
+ workflows:Record<DashboardWorkflow,'included'|'locked'|'hidden'>;preset:{id:number;name:string}|null;
 };
 export type DashboardAction={kind:'plan_expired'|'no_plan'|'payment_info'|'export_failed'|'scripts_ready'|'plan_expiring'|'processing_over'|'processing_low'|'storage_full';
  tone:'red'|'amber'|'purple';data:Record<string,string|number|null>;url:string;key:string};

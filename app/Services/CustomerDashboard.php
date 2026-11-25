@@ -70,11 +70,12 @@ class CustomerDashboard
     public function plan(array $overview, User $user): array
     {
         $preset = $user->default_preset_id ? MediaPreset::where('user_id', $user->id)->find($user->default_preset_id) : null;
-        $features = $overview['package'] && ! $overview['testing'] ? $overview['features'] : null;
+        $workflows = $overview['package'] && ! $overview['testing'] ? ($overview['workflows'] ?? null) : null;
 
         return [
             ...collect($overview)->only(['package', 'status', 'expiring', 'start', 'end', 'days_left', 'next', 'pending_payment', 'processing', 'videos', 'storage', 'jobs', 'testing'])->all(),
-            'workflows' => ['movie' => $features['movie'] ?? true, 'translate' => $features['dub'] ?? true, 'subtitles' => $features['subs'] ?? true],
+            // included / locked (shown with an upgrade prompt) / hidden, as the Admin set it on the plan.
+            'workflows' => collect(['movie', 'translate', 'subtitles'])->mapWithKeys(fn (string $key) => [$key => $workflows[$key]['access'] ?? 'included'])->all(),
             'preset' => $preset ? ['id' => $preset->id, 'name' => $preset->name] : null,
         ];
     }

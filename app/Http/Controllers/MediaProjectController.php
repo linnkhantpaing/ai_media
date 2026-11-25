@@ -424,6 +424,9 @@ class MediaProjectController extends Controller
         return [
             'testingMode' => StudioTesting::enabled(),
             'features' => $definition === [] ? null : PackageCatalog::features($definition),
+            // Per-workflow access (included / locked / hidden), limits and remaining minutes from the Admin plan.
+            'workflows' => $definition === [] ? null : app(UsageLedger::class)->workflowBalances((int) request()->user()->id, $assignment),
+            'watermark' => (bool) ($definition['watermark'] ?? false),
             'planActive' => app(UsageLedger::class)->hasProcessingAccess(request()->user()),
             'billingUrl' => route('account.billing', absolute: false),
             'studioDefaults' => MediaSettings::defaults((int) request()->user()->id),

@@ -61,7 +61,7 @@ class CustomerDashboardTest extends TestCase
         $this->actingAs($this->customer)->get('/')->assertOk()->assertInertia(fn (Assert $page) => $page->component('workspace')
             ->where('dashboard.errors', [])
             ->where('dashboard.plan.package.name', 'Pro')->where('dashboard.plan.expiring', true)
-            ->where('dashboard.plan.workflows', ['movie' => false, 'translate' => true, 'subtitles' => true])
+            ->where('dashboard.plan.workflows', ['movie' => 'locked', 'translate' => 'included', 'subtitles' => 'included'])
             ->where('dashboard.plan.processing.used', 600)
             ->where('dashboard.work.total', 3)->where('dashboard.work.items.0.title', 'Space Odyssey')
             ->where('dashboard.work.items.0.state', 'running')->where('dashboard.work.items.0.stage', 'rendering')->where('dashboard.work.items.0.progress', 64)

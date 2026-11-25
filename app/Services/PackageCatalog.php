@@ -43,13 +43,59 @@ class PackageCatalog
         return $features;
     }
 
+    /** Studio workflows and the package feature flag each one maps to. */
+    public const WORKFLOWS = ['movie' => 'movie', 'translate' => 'dub', 'subtitles' => 'subs'];
+
+    /** included: usable · locked: shown with an upgrade prompt · hidden: not offered. */
+    public const ACCESS = ['included', 'locked', 'hidden'];
+
+    public const LABELS = ['movie' => 'Summarize a Long Movie', 'translate' => 'Translate an Existing Recap', 'subtitles' => 'Subtitles'];
+
+    /**
+     * Per-workflow rules. "minutes" is that workflow's own allowance per period
+     * (null on packages saved before per-workflow allowances: they share the
+     * package-wide allowance). Limits left null fall back to the package limits.
+     *
+     * @param  array<string, mixed>  $definition
+     * @return array<string, array{access: string, minutes: ?int, max_video_seconds: ?int, max_target_seconds: ?int}>
+     */
+    public static function workflows(array $definition): array
+    {
+        $features = self::features($definition);
+        $stored = is_array($definition['workflows'] ?? null) ? $definition['workflows'] : [];
+        $result = [];
+        foreach (self::WORKFLOWS as $key => $feature) {
+            $rule = is_array($stored[$key] ?? null) ? $stored[$key] : [];
+            $access = in_array($rule['access'] ?? null, self::ACCESS, true) ? $rule['access'] : ($features[$feature] ? 'included' : 'locked');
+            $int = fn (string $field): ?int => isset($rule[$field]) && is_numeric($rule[$field]) && (int) $rule[$field] > 0 ? (int) $rule[$field] : null;
+            $result[$key] = ['access' => $access, 'minutes' => $int('minutes'), 'max_video_seconds' => $int('max_video_seconds'),
+                'max_target_seconds' => $key === 'movie' ? $int('max_target_seconds') : null];
+        }
+
+        return $result;
+    }
+
+    /** Which workflow a set of Studio settings runs. */
+    public static function workflowOf(array $settings): string
+    {
+        if (($settings['workflow'] ?? '') === 'movie') {
+            return 'movie';
+        }
+
+        return ($settings['mode'] ?? 'subs') === 'dub' ? 'translate' : 'subtitles';
+    }
+
     /**
      * @param  array<string, mixed>  $definition
      * @return array<string, mixed>
      */
     public static function presentDefinition(array $definition): array
     {
-        return [...$definition, 'features' => self::features($definition)];
+        if (($definition['type'] ?? null) === 'topup') {
+            return $definition;
+        }
+
+        return [...$definition, 'features' => self::features($definition), 'workflows' => self::workflows($definition), 'watermark' => (bool) ($definition['watermark'] ?? false)];
     }
 
     public function uploadSizeOptions(): array
@@ -203,6 +249,9 @@ class PackageCatalog
 
     private function normalize(array $data): array
     {
+        if ($data['type'] === 'topup') {
+            return $this->normalizeTopup($data);
+        }
         $definition = array_intersect_key($data, array_flip(['name', 'code', 'type', 'currency', 'validity_days', 'included_minutes', 'video_limit', 'storage_gib', 'max_video_seconds', 'max_upload_mib', 'concurrency', 'queue_limit', 'retention_days', 'description', 'note']));
         foreach (['validity_days', 'included_minutes', 'video_limit', 'max_video_seconds', 'max_upload_mib', 'concurrency', 'queue_limit', 'retention_days'] as $field) {
             $definition[$field] = isset($data[$field]) ? (int) $data[$field] : null;
@@ -230,14 +279,89 @@ class PackageCatalog
         foreach ($data['features'] ?? [] as $key => $value) {
             $definition['features'][$key] = (bool) $value;
         }
+        $definition['watermark'] = (bool) ($data['watermark'] ?? false);
+        if (is_array($data['workflows'] ?? null)) {
+            $workflows = [];
+            $total = 0;
+            $complete = true;
+            foreach (self::WORKFLOWS as $key => $feature) {
+                $rule = is_array($data['workflows'][$key] ?? null) ? $data['workflows'][$key] : [];
+                $access = in_array($rule['access'] ?? null, self::ACCESS, true) ? $rule['access'] : 'locked';
+                $minutes = isset($rule['minutes']) && $rule['minutes'] !== '' ? (int) $rule['minutes'] : null;
+                $workflows[$key] = ['access' => $access, 'minutes' => $minutes,
+                    'max_video_seconds' => isset($rule['max_video_seconds']) && $rule['max_video_seconds'] !== '' ? (int) $rule['max_video_seconds'] : null,
+                    'max_target_seconds' => $key === 'movie' && isset($rule['max_target_seconds']) && $rule['max_target_seconds'] !== '' ? (int) $rule['max_target_seconds'] : null];
+                // The workflow switch is the source of truth for the matching Studio feature flag.
+                $definition['features'][$feature] = $access === 'included';
+                if ($access === 'included') {
+                    $minutes === null ? $complete = false : $total += $minutes;
+                }
+            }
+            $definition['workflows'] = $workflows;
+            // The package-wide allowance is the sum of the workflow allowances (shown on plan cards).
+            $definition['included_minutes'] = $complete && $total > 0 ? $total : null;
+            $definition['included_seconds'] = $definition['included_minutes'] === null ? null : $definition['included_minutes'] * 60;
+        }
 
         return $definition;
+    }
+
+    /** A Top-up adds minutes to one workflow for the rest of the customer's current period. */
+    private function normalizeTopup(array $data): array
+    {
+        $price = isset($data['price']) ? (string) $data['price'] : null;
+        $minor = null;
+        if ($price !== null) {
+            $parts = explode('.', $price);
+            $minor = (int) $parts[0] * 100 + (int) str_pad($parts[1] ?? '', 2, '0');
+        }
+
+        return ['name' => $data['name'], 'code' => $data['code'], 'type' => 'topup', 'currency' => $data['currency'] ?? null,
+            'price_minor' => $minor, 'price' => $minor === null ? null : sprintf('%d.%02d', intdiv($minor, 100), $minor % 100),
+            'topup' => ['workflow' => in_array($data['topup_workflow'] ?? null, array_keys(self::WORKFLOWS), true) ? $data['topup_workflow'] : null,
+                'minutes' => isset($data['topup_minutes']) && $data['topup_minutes'] !== '' ? (int) $data['topup_minutes'] : null],
+            'description' => $data['description'] ?? '', 'note' => $data['note'] ?? ''];
     }
 
     private function validateForPublication(array $definition): void
     {
         $errors = [];
-        foreach (['currency', 'validity_days', 'included_minutes', 'storage_gib', 'max_video_seconds', 'max_upload_mib', 'concurrency', 'queue_limit', 'retention_days'] as $field) {
+        if (($definition['type'] ?? null) === 'topup') {
+            if (! filled($definition['currency'] ?? null)) {
+                $errors['currency'] = 'Complete this field before publishing.';
+            }
+            if (($definition['price_minor'] ?? 0) <= 0) {
+                $errors['price'] = 'A top-up needs a positive price.';
+            }
+            if (! ($definition['topup']['workflow'] ?? null)) {
+                $errors['topup_workflow'] = 'Choose which workflow these minutes are for.';
+            }
+            if (($definition['topup']['minutes'] ?? 0) < 1) {
+                $errors['topup_minutes'] = 'Enter the minutes this top-up adds.';
+            }
+            if ($errors) {
+                throw ValidationException::withMessages($errors);
+            }
+
+            return;
+        }
+        $workflows = self::workflows($definition);
+        $required = isset($definition['workflows']) ? ['currency', 'validity_days', 'storage_gib', 'max_video_seconds', 'max_upload_mib', 'concurrency', 'queue_limit', 'retention_days']
+            : ['currency', 'validity_days', 'included_minutes', 'storage_gib', 'max_video_seconds', 'max_upload_mib', 'concurrency', 'queue_limit', 'retention_days'];
+        foreach ($workflows as $key => $rule) {
+            if ($rule['access'] !== 'included' || ! isset($definition['workflows'])) {
+                continue;
+            }
+            if ($rule['minutes'] === null) {
+                $errors['workflows.'.$key.'.minutes'] = 'Set the minutes included for this workflow.';
+            } elseif (min($rule['max_video_seconds'] ?? PHP_INT_MAX, $definition['max_video_seconds'] ?? PHP_INT_MAX) > $rule['minutes'] * 60) {
+                $errors['workflows.'.$key.'.minutes'] = 'The minutes must cover at least one maximum-length video for this workflow.';
+            }
+            if ($rule['max_video_seconds'] !== null && $rule['max_video_seconds'] > ($definition['max_video_seconds'] ?? 0)) {
+                $errors['workflows.'.$key.'.max_video_seconds'] = 'This cannot exceed the package maximum video duration.';
+            }
+        }
+        foreach ($required as $field) {
             if (! isset($definition[$field]) || $definition[$field] === '') {
                 $errors[$field] = 'Complete this field before publishing.';
             }
@@ -255,7 +379,7 @@ class PackageCatalog
         if (($definition['max_upload_bytes'] ?? 0) > ($definition['storage_bytes'] ?? 0)) {
             $errors['storage_gib'] = 'Customer storage must fit at least one allowed upload.';
         }
-        if (($definition['max_video_seconds'] ?? 0) > ($definition['included_seconds'] ?? 0)) {
+        if (! isset($definition['workflows']) && ($definition['max_video_seconds'] ?? 0) > ($definition['included_seconds'] ?? 0)) {
             $errors['included_minutes'] = 'Included usage must cover at least one maximum-length video.';
         }
         if ($limits['retention_enabled'] && ($definition['retention_days'] ?? 0) > $limits['retention_days']) {
@@ -266,7 +390,7 @@ class PackageCatalog
             $errors['features.local'] = 'Enable at least one input source.';
         }
         if (! $f['subs'] && ! $f['dub'] && ! $f['movie']) {
-            $errors['features.subs'] = 'Enable at least one processing mode.';
+            $errors[isset($definition['workflows']) ? 'workflows.subtitles.access' : 'features.subs'] = 'Include at least one workflow.';
         }
         if (! $f['mp4'] && ! $f['srt'] && ! $f['audio']) {
             $errors['features.mp4'] = 'Enable at least one export.';

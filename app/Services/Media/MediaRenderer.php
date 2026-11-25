@@ -4,6 +4,7 @@ namespace App\Services\Media;
 
 use App\Exceptions\MediaFailure;
 use App\Models\MediaRun;
+use App\Models\UsageRecord;
 use App\Support\MediaSettings;
 use Illuminate\Support\Facades\Storage;
 
@@ -55,9 +56,11 @@ class MediaRenderer
         } elseif ($settings['output'] !== 'srt') {
             $stage('render');
             $target = $directory.'/recap.mp4';
+            $watermark = self::watermarked($run);
             $this->runtime->execute('ffmpeg', [
                 '-nostdin', '-v', 'error', '-y', '-i', $source,
-                '-filter_complex', $this->filters($settings, $project->metadata),
+                ...($watermark ? ['-i', resource_path('brand/zatlan-logo.png')] : []),
+                '-filter_complex', $this->filters($settings, $project->metadata, $watermark),
                 ...($settings['mode'] === 'subs' ? $this->sourceAudioFilters($lines) : []),
                 '-map', '[v]', '-map', '0:a:0', '-c:v', 'libx264', '-preset', 'fast', '-crf', '21',
                 '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '192k', '-movflags', '+faststart',
@@ -338,7 +341,19 @@ class MediaRenderer
         return "boxblur=luma_radius='min({$radius},max(0,floor(min(w,h)/2)-1))':luma_power=2:chroma_radius='min({$radius},max(0,floor(min(cw,ch)/2)-1))':chroma_power=2";
     }
 
-    private function filters(array $settings, array $metadata): string
+    /**
+     * Whether this export carries the ZATLAN watermark: decided by the plan the run was
+     * reserved under (its usage snapshot), so a later plan change cannot alter a running export.
+     */
+    public static function watermarked(MediaRun $run): bool
+    {
+        $snapshot = UsageRecord::where('media_run_id', $run->id)->value('package_snapshot');
+        $snapshot = is_string($snapshot) ? json_decode($snapshot, true) : $snapshot;
+
+        return (bool) ($snapshot['definition']['watermark'] ?? false);
+    }
+
+    private function filters(array $settings, array $metadata, bool $watermark = false): string
     {
         [$w, $h] = $this->dimensions($settings, $metadata);
         $filter = '';
@@ -361,6 +376,15 @@ class MediaRenderer
             $filter .= ';[base]null[covered]';
         }
 
-        return $filter.($settings['burn_subtitles'] ? ';[covered]ass=recap.ass:fontsdir=fonts[v]' : ';[covered]null[v]');
+        $final = $watermark ? '[marked]' : '[v]';
+        $filter .= $settings['burn_subtitles'] ? ';[covered]ass=recap.ass:fontsdir=fonts'.$final : ';[covered]null'.$final;
+        if ($watermark) {
+            // Logo in the top-right corner (subtitles sit at the bottom), ~18% of the shorter side, 60% opacity.
+            $width = max(64, (int) (round(min($w, $h) * 0.18 / 2) * 2));
+            $margin = max(12, (int) round(min($w, $h) * 0.03));
+            $filter .= ';[1:v]scale='.$width.':-2,format=rgba,colorchannelmixer=aa=0.6[logo];[marked][logo]overlay=W-w-'.$margin.':'.$margin.':format=auto[v]';
+        }
+
+        return $filter;
     }
 }

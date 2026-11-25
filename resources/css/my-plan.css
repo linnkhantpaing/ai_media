@@ -91,3 +91,17 @@ html:has(.plan-dialog[open]){overflow:hidden}
 .plan-detail-dialog .plan-dialog-footer .plan-button{font-size:10px;padding:6px 12px;min-height:30px}
 .plan-detail-dialog .plan-dialog-footer svg{width:13px;height:13px}
 @media(max-width:360px){.plan-detail-dialog .plan-dialog-body{padding:14px}.plan-detail-dialog .plan-detail-totals>div{padding:10px}.plan-detail-totals dd{font-size:11px}.plan-detail-dialog .plan-detail-facts>div{grid-template-columns:75px minmax(0,1fr);gap:10px}}
+.plan-workflows{margin:4px 0 22px}.plan-workflows>header{display:flex;align-items:baseline;flex-wrap:wrap;gap:4px 12px;margin-bottom:12px}.plan-workflows h2{display:flex;align-items:center;gap:8px;margin:0;font-size:13px}.plan-workflows header p{margin:0;font-size:10px;color:var(--text-muted)}
+.plan-workflow-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.plan-workflow{display:flex;flex-direction:column;gap:10px;min-width:0;padding:15px 16px;border-radius:16px;box-shadow:inset 0 1px 0 color-mix(in srgb,var(--text) 4%,transparent),0 10px 24px #00000040}
+.plan-workflow.is-locked{opacity:.85}
+.plan-workflow-head{display:flex;align-items:center;gap:9px;min-width:0}.plan-workflow-head strong{font-size:11.5px;min-width:0;flex:1;line-height:1.6}
+.plan-workflow-icon{width:30px;height:30px;border-radius:10px;display:grid;place-items:center;flex-shrink:0;color:var(--primary);background:color-mix(in srgb,var(--primary) 13%,transparent)}.plan-workflow-icon svg{width:15px!important;height:15px!important}
+.plan-pro-badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:20px;font-size:9px;font-weight:800;letter-spacing:.5px;color:#1A1300;background:linear-gradient(135deg,#F5C66A,#E6A23C)}.plan-pro-badge svg{width:10px!important;height:10px!important}
+.plan-workflow .plan-available{margin:0}.plan-workflow .plan-available strong{font-size:17px}
+.plan-workflow dl{display:flex;flex-wrap:wrap;gap:4px 16px;margin:0}.plan-workflow dl div{display:flex;gap:6px;font-size:10px}.plan-workflow dt{color:var(--text-muted)}.plan-workflow dd{margin:0;font-weight:650}
+.plan-workflow-foot{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;margin-top:auto;font-size:10px;color:var(--text-secondary)}.plan-workflow-foot .plan-link{margin-left:auto;font-size:10.5px}.plan-workflow-foot .plan-link svg{width:13px!important;height:13px!important}
+.plan-topup-chip{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:20px;color:var(--mint);background:color-mix(in srgb,var(--mint) 11%,transparent);font-weight:700}.plan-topup-chip svg{width:11px!important;height:11px!important}
+.plan-workflow-shared{margin:0;font-size:10.5px;color:var(--text-secondary)}
+.plan-workflow-locked{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:auto}.plan-workflow-locked p{margin:0;font-size:10.5px;color:var(--text-secondary)}
+@media(max-width:1000px){.plan-workflow-grid{grid-template-columns:1fr}}

@@ -16,7 +16,7 @@ export interface MediaLine { scene_id?: string; audio_muted?:boolean; subtitle_h
 export interface MediaProject {
     narrationFitReady?:boolean; scriptRevision?:string; id: string; title: string; filename: string; bytes: number; uploadedBytes: number;
     sourceProgress?:number; status: string; errorCode: string | null; storageDisk: string; fingerprint: string | null;
-    allowance?: {estimated_seconds:number;videos:number;available_seconds:number}|null;
+    allowance?: {estimated_seconds:number;videos:number;available_seconds:number;workflow?:string}|null;
     sourceType: 'upload' | 'youtube'; sourceUrl: string | null;
     import: { stage: string; downloadedBytes: number; cancelRequested: boolean } | null;
     metadata: { duration: number; width: number; height: number; aspect: string; audio: boolean; poster: boolean; output?: { format?: string; duration?: number; bytes: number; width?: number; height?: number; segments: number } } | null;
@@ -25,7 +25,7 @@ export interface MediaProject {
     links: Record<'scenes' | 'styledSubtitles' | 'status' | 'upload' | 'complete' | 'update' | 'destroy' | 'uploadPage' | 'setup' | 'analysis' | 'start' | 'generate' | 'script' | 'retry' | 'cancel' | 'reopen' | 'importRetry' | 'importCancel' | 'source' | 'poster' | 'video' | 'audio' | 'previews' | 'subtitles', string>;
 }
 export interface MediaPageProps {
-    testingMode?:boolean; features?:Record<string,boolean>|null; planActive?:boolean; billingUrl?:string; personalDefaults?:Partial<MediaSettings>; startPreset?:{id:number;name:string}|null; studioDefaults?:MediaSettings; initialProject: MediaProject | null; recentProjects?: MediaProject[];
+    testingMode?:boolean; features?:Record<string,boolean>|null; workflows?:Record<'movie'|'translate'|'subtitles',StudioWorkflowRule>|null; watermark?:boolean; planActive?:boolean; billingUrl?:string; personalDefaults?:Partial<MediaSettings>; startPreset?:{id:number;name:string}|null; studioDefaults?:MediaSettings; initialProject: MediaProject | null; recentProjects?: MediaProject[];
     runtime: { mediaReady: boolean; aiReady: boolean; backgroundSeparation: boolean; voices: string[]; youtubeReady: boolean };
     limits: { bytes: number; duration: number; chunkBytes: number };
     storage: { disk: string; ready: boolean; used: number; limit: number };
@@ -46,3 +46,5 @@ export interface LibraryPageProps {
 export interface MediaPreset {id:number;name:string;settings:MediaSettings}
 export interface TimingLine {index:number;original:number;voice:number;output:number;extra:number;textHash:string}
 export interface MediaPreview {id:string;kind:'voice'|'video'|'timing'|'shorten'|'rewrite'|'fit';status:'queued'|'running'|'completed'|'failed'|'cancelled';progress:number;errorCode:string|null;cancelRequested:boolean;matchesCurrent:boolean;result:{retryAt?:string;work?:{phase:string;scene?:number;total:number;completed:number;attempt?:number};ready?:boolean;signature?:string;scenes?:MediaLine[];measurements?:{index:number;target:number;actual:number;ready:boolean;locked?:boolean;muted?:boolean}[];rate?:number;target?:number;sceneId?:string|null;duration?:number;line?:number;text?:string;originalHash?:string;lines?:TimingLine[];warningCount?:number}|null;links:{status:string;cancel:string;file:string|null}}
+
+export type StudioWorkflowRule={access:'included'|'locked'|'hidden';minutes:number|null;max_video_seconds:number|null;max_target_seconds:number|null;credits:number;total:number|null;used:number;reserved:number;available:number|null};

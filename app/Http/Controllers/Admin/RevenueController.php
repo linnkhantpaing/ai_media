@@ -24,7 +24,7 @@ class RevenueController extends Controller
             'from' => ['nullable', 'required_if:dates,custom', 'date_format:Y-m-d', 'after_or_equal:1900-01-01'],
             'to' => ['nullable', 'required_if:dates,custom', 'date_format:Y-m-d', 'after_or_equal:from', 'before_or_equal:2100-12-31'],
             'package' => ['nullable', 'integer', 'min:1'], 'method' => ['nullable', 'integer', 'min:1'],
-            'purpose' => ['nullable', Rule::in(['new', 'renewal', 'change'])],
+            'purpose' => ['nullable', Rule::in(['new', 'renewal', 'change', 'topup'])],
             'type' => ['nullable', Rule::in(['payment', 'refund'])], 'q' => ['nullable', 'string', 'max:100'],
             'sort' => ['nullable', Rule::in(['newest', 'oldest', 'amount'])],
             'group' => ['nullable', Rule::in(['auto', 'day', 'week', 'month'])],

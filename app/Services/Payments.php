@@ -12,6 +12,7 @@ use App\Models\PaymentMethodVersion;
 use App\Models\PaymentReceipt;
 use App\Models\PaymentRefund;
 use App\Models\PaymentTransaction;
+use App\Models\UsageCredit;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\UploadedFile;
@@ -152,6 +153,9 @@ class Payments
 
     public function recordingPurposes(array $context, int $packageId, int $version): array
     {
+        if (Package::whereKey($packageId)->value('type') === 'topup') {
+            return $this->topupBlocker($context['active'] ?? null, $packageId) === null ? ['topup'] : [];
+        }
         if ($context['scheduled']) {
             return [];
         }
@@ -178,6 +182,41 @@ class Payments
         $start = $purpose === 'renewal' && $current ? $current->ends_at : CarbonImmutable::now();
 
         return ['starts_at' => $start->toIso8601String(), 'ends_at' => $start->addDays((int) $snapshot['definition']['validity_days'])->toIso8601String(), 'replaces_id' => $purpose === 'change' ? $current?->id : null, 'current_name' => $current?->effectiveSnapshot()['name'] ?? null, 'customer_revision' => $user->account_revision];
+    }
+
+    /**
+     * Why a top-up cannot be bought right now (null when it can): minutes are added to the
+     * customer's active period, so it needs one whose plan includes that workflow.
+     */
+    public function topupBlocker(?CustomerPackageAssignment $active, int $packageId, ?array $definition = null): ?string
+    {
+        if (! $active || $active->status() !== 'active') {
+            return 'Top-up minutes need an active plan. Choose a plan first.';
+        }
+        $definition ??= PackageVersion::where('package_id', $packageId)->where('number', Package::whereKey($packageId)->value('published_version'))->value('definition') ?? [];
+        $workflow = $definition['topup']['workflow'] ?? null;
+        if (! $workflow || (PackageCatalog::workflows($active->effectiveSnapshot()['definition'] ?? [])[$workflow]['access'] ?? null) !== 'included') {
+            return 'Your current plan does not include this workflow. Upgrade your plan to use these minutes.';
+        }
+
+        return null;
+    }
+
+    /** Adds the purchased top-up minutes to the customer's current allowance period. */
+    private function credit(User $actor, PaymentTransaction $p, User $user): UsageCredit
+    {
+        $active = CustomerPackageAssignment::current()->where('user_id', $user->id)->lockForUpdate()->first();
+        $this->require($this->topupBlocker($active, (int) $p->package_snapshot['id'], $p->package_snapshot['definition']) === null, 'purpose',
+            'The customer no longer has an active plan that includes this workflow. Reject the payment or ask them to renew first.');
+        $topup = $p->package_snapshot['definition']['topup'];
+        $credit = UsageCredit::create(['user_id' => $user->id, 'payment_transaction_id' => $p->id, 'assignment_id' => $active->id, 'package_id' => $p->package_snapshot['id'],
+            'workflow' => $topup['workflow'], 'seconds' => (int) $topup['minutes'] * 60, 'allowance_start' => $active->allowance_starts_at ?? $active->starts_at,
+            'expires_at' => $active->ends_at, 'package_snapshot' => $p->package_snapshot]);
+        $user->increment('account_revision');
+        CustomerAccountEvent::create(['user_id' => $user->id, 'actor_id' => $actor->id, 'type' => 'topup_payment', 'metadata' => ['payment_id' => $p->id, 'credit_id' => $credit->id, 'workflow' => $topup['workflow'], 'minutes' => (int) $topup['minutes'], 'assignment_id' => $active->id],
+            'operation_key' => (string) Str::uuid(), 'fingerprint' => hash('sha256', 'topup:'.$p->id)]);
+
+        return $credit;
     }
 
     private function grant(User $actor, PaymentTransaction $p, User $user, array $plan): CustomerPackageAssignment
@@ -265,7 +304,8 @@ class Payments
             $before = $existing ? $this->status($payment) : null;
             $context = $this->recordingContext($user);
             $purposes = $this->recordingPurposes($context, (int) $data['package_id'], (int) $data['package_version']);
-            $this->require(count($purposes) > 0, 'package_id', 'A next subscription is already scheduled. Contact support before making another payment.');
+            $isTopup = Package::whereKey((int) $data['package_id'])->value('type') === 'topup';
+            $this->require(count($purposes) > 0, 'package_id', $isTopup ? ($this->topupBlocker($context['active'], (int) $data['package_id']) ?? 'This top-up is not available.') : 'A next subscription is already scheduled. Contact support before making another payment.');
             $data['purpose'] = $existing ? $payment->purpose : $purposes[0];
             $data['internal_note'] = $payment->internal_note ?? '';
             $oldCurrency = $payment->currency;
@@ -302,15 +342,19 @@ class Payments
             $this->require($package->status === 'active' && $package->published_version > 0, 'package_id', 'Choose an active published package.');
             abort_unless($package->published_version === (int) $data['package_version'], 409, 'Package changed. Refresh package options.');
             $version = PackageVersion::where('package_id', $package->id)->where('number', $package->published_version)->firstOrFail();
-            $this->require(($version->definition['type'] ?? $package->type) === 'paid' && (int) $version->definition['price_minor'] > 0, 'package_id', 'Free Trial assignments do not need a paid transaction.');
-            $snapshot = ['id' => $package->id, 'name' => $package->name, 'code' => $package->code, 'type' => 'paid', 'version' => $version->number, 'definition' => $version->definition, 'validity_mode' => 'package'];
+            $type = $version->definition['type'] ?? $package->type;
+            $this->require(in_array($type, ['paid', 'topup'], true) && (int) $version->definition['price_minor'] > 0, 'package_id', 'Free Trial assignments do not need a paid transaction.');
+            $snapshot = ['id' => $package->id, 'name' => $package->name, 'code' => $package->code, 'type' => $type, 'version' => $version->number, 'definition' => $version->definition, 'validity_mode' => 'package'];
             $versionId = $version->id;
         }
         $definition = $snapshot['definition'];
         $context = $this->recordingContext($user);
-        $this->require(! $context['scheduled'], 'purpose', 'A scheduled subscription already exists. Resolve it in Subscriptions before adding another period.');
-        $this->require(in_array($data['purpose'], $this->recordingPurposes($context, (int) $snapshot['id'], (int) $snapshot['version']), true), 'purpose', 'This purpose does not match the selected customer and package. Refresh payment options.');
-        $this->plan($user, $data['purpose'], $snapshot);
+        $topup = ($snapshot['type'] ?? null) === 'topup';
+        $this->require($topup || ! $context['scheduled'], 'purpose', 'A scheduled subscription already exists. Resolve it in Subscriptions before adding another period.');
+        $this->require(in_array($data['purpose'], $this->recordingPurposes($context, (int) $snapshot['id'], (int) $snapshot['version']), true), 'purpose', $topup ? ($this->topupBlocker($context['active'], (int) $snapshot['id'], $definition) ?? 'Refresh payment options.') : 'This purpose does not match the selected customer and package. Refresh payment options.');
+        if (! $topup) {
+            $this->plan($user, $data['purpose'], $snapshot);
+        }
         abort_unless(app(PaymentConfiguration::class)->settings()['revision'] === (int) $data['config_revision'], 409, 'Receiving accounts changed. Refresh payment options.');
         $receiving = $p->exists && $p->payment_method_id === (int) $data['payment_method_id'] && $p->currency === $definition['currency']
             ? $p->receiving_snapshot
@@ -393,14 +437,19 @@ class Payments
                     $this->validateEvidence($p);
                     $this->require($p->received_minor === $p->expected_minor, 'received', 'Received amount must exactly match the requested amount and currency.');
                     $this->require(! $this->hasDuplicate($p, true), 'reference', 'This transfer reference or receipt is already attached to an approved payment.');
-                    $plan = $this->plan($user, $p->purpose, $p->package_snapshot);
-                    $assignment = $this->grant($actor, $p, $user, $plan);
-                    $p->subscription_id = $assignment->id;
+                    if ($p->purpose === 'topup') {
+                        $credit = $this->credit($actor, $p, $user);
+                        $meta += ['credit_id' => $credit->id, 'workflow' => $credit->workflow, 'seconds' => $credit->seconds];
+                    } else {
+                        $plan = $this->plan($user, $p->purpose, $p->package_snapshot);
+                        $assignment = $this->grant($actor, $p, $user, $plan);
+                        $p->subscription_id = $assignment->id;
+                        $meta += ['subscription_id' => $assignment->id, 'starts_at' => $plan['starts_at'], 'ends_at' => $plan['ends_at']];
+                    }
                     $p->status = 'approved';
                     $p->approved_at = now();
                     $p->reviewed_by = $actor->id;
                     $p->approved_reference_hash = $p->reference_hash;
-                    $meta += ['subscription_id' => $assignment->id, 'starts_at' => $plan['starts_at'], 'ends_at' => $plan['ends_at']];
                 } else {
                     $p->status = match ($action) {
                         'review' => 'under_review','information' => 'needs_information','reject' => 'rejected','cancel' => 'cancelled'
@@ -465,7 +514,15 @@ class Payments
                 $this->require(! $p->receiving_snapshot['rules']['evidence_required'] || $file, 'receipt', 'Provide refund transfer proof.');
                 $access = $data['access_action'] ?? $refund->access_action;
                 $assignment = $p->subscription_id ? CustomerPackageAssignment::lockForUpdate()->find($p->subscription_id) : null;
-                if ($access !== 'keep') {
+                if ($p->purpose === 'topup' && $access !== 'keep') {
+                    // "End access" on a top-up refund removes the purchased minutes from the period.
+                    $this->require($access === 'end', 'access_action', 'A top-up refund can keep or remove the purchased minutes.');
+                    $credit = UsageCredit::where('payment_transaction_id', $p->id)->lockForUpdate()->first();
+                    $this->require($credit && $credit->revoked_at === null, 'access_action', 'These top-up minutes were already removed.');
+                    $credit->update(['revoked_at' => now()]);
+                    $user->increment('account_revision');
+                    CustomerAccountEvent::create(['user_id' => $user->id, 'actor_id' => $actor->id, 'type' => 'topup_refund', 'metadata' => ['payment_id' => $p->id, 'refund_id' => $refund->id, 'credit_id' => $credit->id, 'reason' => $data['reason']], 'operation_key' => (string) Str::uuid(), 'fingerprint' => hash('sha256', 'topup-refund:'.$refund->id)]);
+                } elseif ($access !== 'keep') {
                     $this->require($assignment && (in_array($access, ['end', 'cancel'], true)) && $assignment->status() === ($access === 'end' ? 'active' : 'upcoming'), 'access_action', 'Only the linked active or upcoming subscription can be ended or cancelled. Review its current state.');
                     $assignment->update(['closed_kind' => $access === 'end' ? 'ended' : 'cancelled', 'closed_at' => now()]);
                     $user->increment('account_revision');

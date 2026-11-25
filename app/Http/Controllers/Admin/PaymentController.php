@@ -120,7 +120,7 @@ class PaymentController extends Controller
             $snapshot = $editing->package_snapshot;
             $packages = array_values(array_filter($packages, fn ($p) => $p['id'] !== (int) $snapshot['id']));
             array_unshift($packages, ['id' => (int) $snapshot['id'], 'name' => $snapshot['name'], 'version' => (int) $snapshot['version'], 'currency' => $editing->currency,
-                'price_minor' => $editing->expected_minor, 'validity_days' => (int) $snapshot['definition']['validity_days'], 'available' => true]);
+                'price_minor' => $editing->expected_minor, 'validity_days' => (int) ($snapshot['definition']['validity_days'] ?? 0), 'available' => true]);
         }
         $methodOptions = $methods->map(fn ($m) => $configuration->resource($m, $settings))->values();
         if ($editing) {

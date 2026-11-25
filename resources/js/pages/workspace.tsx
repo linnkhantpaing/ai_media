@@ -390,8 +390,8 @@ function QuickStart({plan}:{plan:DashboardPlan|null}){
  const base=frameLinks.newProject!;
  return <section className="db-card db-quick">
   <header className="db-card-head"><h2><span className="db-head-icon"><StudioIcon name="bolt"/></span>{t('quickStart')}</h2></header>
-  <div className="db-quick-grid">{tiles.map(tile=>{
-   const locked=plan?.workflows[tile.key]===false;
+  <div className="db-quick-grid">{tiles.filter(tile=>plan?.workflows[tile.key]!=='hidden').map(tile=>{
+   const locked=plan?.workflows[tile.key]==='locked';
    const href=locked?frameLinks.billing!:base+'?workflow='+tile.key+(plan?.preset?'&preset='+plan.preset.id:'');
    return <ActionTooltip key={tile.key} label={locked?t('notIncluded'):t(('qd_'+tile.key) as DashboardWord)}><Link href={href} className={'db-quick-tile is-'+tile.key+(locked?' is-locked':'')} aria-label={t(('q_'+tile.key) as DashboardWord)+(locked?' · '+t('notIncluded'):'')}>
     <span className="db-quick-icon">{tile.icon}</span><span>{t(('q_'+tile.key) as DashboardWord)}</span>{locked&&<i className="db-quick-lock"><StudioIcon name="lock"/></i>}

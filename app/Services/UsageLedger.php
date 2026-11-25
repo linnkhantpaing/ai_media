@@ -6,6 +6,7 @@ use App\Exceptions\MediaFailure;
 use App\Models\CustomerPackageAssignment;
 use App\Models\MediaProject;
 use App\Models\MediaRun;
+use App\Models\UsageCredit;
 use App\Models\UsageEvent;
 use App\Models\UsageRecord;
 use App\Models\User;
@@ -61,6 +62,12 @@ class UsageLedger
                 $required['settings.'.$keys[0]] = $feature;
             }
         }
+        $workflow = PackageCatalog::workflowOf($settings);
+        $rule = PackageCatalog::workflows($snapshot['definition'] ?? [])[$workflow];
+        $extra = [];
+        if ($workflow === 'movie' && $rule['max_target_seconds'] !== null && (int) ($settings['target_seconds'] ?? 0) > $rule['max_target_seconds']) {
+            $extra['settings.target_seconds'] = [$snapshot['name'].' allows recaps up to '.$this->minutes($rule['max_target_seconds']).' minutes. Upgrade your plan in Billing & Payments for longer recaps.'];
+        }
         $labels = ['youtube' => 'YouTube Import', 'local' => 'Local Video', 'movie' => 'Summarize a Long Movie', 'subs' => 'Subtitles', 'dub' => 'Translate an Existing Recap', 'audio' => 'Audio Export', 'mp4' => 'MP4 Video', 'srt' => 'SRT/ASS Subtitles', 'keep_background' => 'Keep Music & Effects',
             'subtitle_style' => 'Subtitle Styling', 'cover_subtitles' => 'Cover Original Subtitles', 'layout' => 'Aspect Ratio & Fill'];
         $errors = [];
@@ -70,7 +77,43 @@ class UsageLedger
             }
         }
 
-        return $errors;
+        return [...$errors, ...$extra];
+    }
+
+    private function minutes(int $seconds): string
+    {
+        return rtrim(rtrim(number_format($seconds / 60, 1, '.', ''), '0'), '.');
+    }
+
+    /** Purchased top-up seconds for the allowance period, optionally for one workflow. */
+    public function credits(int $userId, mixed $anchor, ?string $workflow = null): int
+    {
+        $query = UsageCredit::where('user_id', $userId)->whereNull('revoked_at');
+        $anchor ? $query->where('allowance_start', $anchor) : $query->whereNull('allowance_start');
+
+        return (int) $query->when($workflow, fn ($q) => $q->where('workflow', $workflow))->sum('seconds');
+    }
+
+    /**
+     * Allowance state of every workflow for the customer's current period: its own minutes
+     * plus purchased top-ups, what is used and reserved, and what is still available.
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    public function workflowBalances(int $userId, ?CustomerPackageAssignment $assignment): array
+    {
+        $definition = $assignment?->effectiveSnapshot()['definition'] ?? [];
+        $anchor = $assignment?->allowance_starts_at ?? $assignment?->starts_at;
+        $result = [];
+        foreach (PackageCatalog::workflows($definition) as $key => $rule) {
+            $balance = $this->balances($userId, $anchor, $key);
+            $credits = $assignment ? $this->credits($userId, $anchor, $key) : 0;
+            $total = $rule['minutes'] === null ? null : $rule['minutes'] * 60 + $credits;
+            $result[$key] = [...$rule, 'credits' => $credits, 'total' => $total, 'used' => $balance['seconds'], 'reserved' => $balance['reserved_seconds'],
+                'available' => $total === null ? null : max(0, $total - $balance['seconds'] - $balance['reserved_seconds'])];
+        }
+
+        return $result;
     }
 
     /**
@@ -130,13 +173,19 @@ class UsageLedger
         $b = $this->balances($project->user_id, $anchor);
         $d = $a->effectiveSnapshot()['definition'];
         $counted = UsageRecord::where('user_id', $project->user_id)->where('media_project_id', $project->id)->where('allowance_start', $anchor)->whereRaw('charged_videos > returned_videos')->exists();
+        $available = max(0, ($d['included_seconds'] ?? ($d['included_minutes'] ?? 0) * 60) + $this->credits($project->user_id, $anchor) - $b['seconds'] - $b['reserved_seconds']);
+        $workflow = PackageCatalog::workflowOf(is_array($project->settings) ? $project->settings : []);
+        $own = $this->workflowBalances($project->user_id, $a)[$workflow];
+        if ($own['available'] !== null) {
+            $available = min($available, $own['available']);
+        }
 
-        return ['estimated_seconds' => (int) ceil($project->metadata['duration']), 'videos' => $counted ? 0 : 1, 'available_seconds' => max(0, ($d['included_seconds'] ?? ($d['included_minutes'] ?? 0) * 60) - $b['seconds'] - $b['reserved_seconds'])];
+        return ['estimated_seconds' => (int) ceil($project->metadata['duration']), 'videos' => $counted ? 0 : 1, 'available_seconds' => $available, 'workflow' => $workflow];
     }
 
-    public function balances(int $userId, mixed $anchor): array
+    public function balances(int $userId, mixed $anchor, ?string $workflow = null): array
     {
-        $query = UsageRecord::where('user_id', $userId)->where('kind', 'processing');
+        $query = UsageRecord::where('user_id', $userId)->where('kind', 'processing')->when($workflow, fn ($q) => $q->where('workflow', $workflow));
         $anchor ? $query->where('allowance_start', $anchor) : $query->whereNull('allowance_start');
 
         return ['seconds' => (int) (clone $query)->selectRaw('COALESCE(SUM(charged_seconds-returned_seconds),0) AS amount')->value('amount'),
@@ -175,12 +224,28 @@ class UsageLedger
                 ->where(fn ($q) => $q->where('reserved_videos', '>', 0)->orWhereRaw('charged_videos > returned_videos'));
             $anchor ? $prior->where('allowance_start', $anchor) : $prior->whereNull('allowance_start');
             $videos = $prior->exists() ? 0 : 1;
+            $workflow = PackageCatalog::workflowOf(is_array($run->settings) ? $run->settings : []);
             if ($assignment && ! StudioTesting::enabled()) {
+                $rule = PackageCatalog::workflows($definition)[$workflow];
+                $label = PackageCatalog::LABELS[$workflow];
+                if ($rule['access'] !== 'included') {
+                    throw ValidationException::withMessages([$workflow === 'movie' ? 'settings.workflow' : 'settings.mode' => [($snapshot['name'] ?? 'Your plan').' does not include '.$label.'. Upgrade your plan in Billing & Payments to use it.']]);
+                }
                 if ($seconds > ($definition['max_video_seconds'] ?? 0)) {
                     $this->invalid('The video exceeds the maximum duration for this package.');
                 }
-                if ($totals['seconds'] + $totals['reserved_seconds'] + $seconds > ($definition['included_seconds'] ?? ($definition['included_minutes'] ?? 0) * 60)) {
+                if ($rule['max_video_seconds'] !== null && $seconds > $rule['max_video_seconds']) {
+                    $this->invalid($label.' accepts videos up to '.$this->minutes($rule['max_video_seconds']).' minutes on this plan.');
+                }
+                $credits = $this->credits($user->id, $anchor);
+                if ($totals['seconds'] + $totals['reserved_seconds'] + $seconds > ($definition['included_seconds'] ?? ($definition['included_minutes'] ?? 0) * 60) + $credits) {
                     $this->invalid('There is not enough processing allowance for this video.');
+                }
+                if ($rule['minutes'] !== null) {
+                    $own = $this->balances($user->id, $anchor, $workflow);
+                    if ($own['seconds'] + $own['reserved_seconds'] + $seconds > $rule['minutes'] * 60 + $this->credits($user->id, $anchor, $workflow)) {
+                        $this->invalid('There are not enough '.$label.' minutes left this period. Buy more minutes in Billing & Payments.');
+                    }
                 }
                 if (isset($definition['video_limit']) && $definition['video_limit'] < $totals['videos'] + $totals['reserved_videos'] + $videos) {
                     $this->invalid('The video allowance for this period has been used.');
@@ -196,11 +261,11 @@ class UsageLedger
                 }
             }
             $record = $existing ?? new UsageRecord(['operation_key' => 'run:'.$run->id, 'media_run_id' => $run->id, 'media_project_id' => $project->id, 'user_id' => $user->id,
-                'assignment_id' => $assignment?->id, 'package_id' => $assignment?->package_id, 'kind' => 'processing',
+                'assignment_id' => $assignment?->id, 'package_id' => $assignment?->package_id, 'kind' => 'processing', 'workflow' => $workflow,
                 'customer_snapshot' => ['name' => $user->name, 'email' => $user->email],
                 'project_snapshot' => ['title' => $project->title, 'duration' => $seconds],
                 'package_snapshot' => $snapshot, 'period_start' => $assignment?->starts_at, 'period_end' => $assignment?->ends_at, 'allowance_start' => $anchor]);
-            $record->fill(['status' => 'reserved', 'reserved_seconds' => $seconds, 'reserved_videos' => $videos, 'revision' => ($existing?->revision ?? 0) + 1])->save();
+            $record->fill(['status' => 'reserved', 'workflow' => $workflow, 'reserved_seconds' => $seconds, 'reserved_videos' => $videos, 'revision' => ($existing?->revision ?? 0) + 1])->save();
             $this->event($record, 'reserved', ['seconds' => $seconds, 'videos' => $videos]);
 
             return $record;

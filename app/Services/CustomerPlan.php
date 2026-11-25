@@ -27,6 +27,8 @@ class CustomerPlan
         $state = $assignment?->status() ?? 'none';
         $active = $state === 'active' && $user->account_status === 'active';
         $seconds = $definition['included_seconds'] ?? (isset($definition['included_minutes']) ? (int) ($definition['included_minutes'] * 60) : null);
+        $credits = $assignment ? $this->ledger->credits($user->id, $assignment->allowance_starts_at ?? $assignment->starts_at) : 0;
+        $seconds = $seconds === null ? null : $seconds + $credits;
         $storage = $definition['storage_bytes'] ?? null;
         $next = CustomerPackageAssignment::standing()->where('user_id', $user->id)->whereNull('closed_kind')
             ->where('starts_at', '>', now())->when($assignment, fn (Builder $q) => $q->where('id', '!=', $assignment->id))->orderBy('starts_at')->first();
@@ -50,6 +52,8 @@ class CustomerPlan
             'limits' => ['duration' => $definition['max_video_seconds'] ?? null, 'upload' => $definition['max_upload_bytes'] ?? (isset($definition['max_upload_mib']) ? $definition['max_upload_mib'] * 1048576 : null),
                 'retention_days' => $definition['retention_days'] ?? null, 'cleanup_enabled' => (bool) ($policy['retention_enabled'] ?? false)],
             'features' => PackageCatalog::features($definition),
+            'workflows' => $snapshot ? array_map(fn (array $w): array => [...$w, 'available' => $active ? $w['available'] : 0], $this->ledger->workflowBalances($user->id, $assignment)) : null,
+            'credits' => $credits, 'watermark' => (bool) ($definition['watermark'] ?? false),
             'testing' => StudioTesting::enabled(), 'updated_at' => now()->toIso8601String(),
         ];
     }
@@ -130,7 +134,7 @@ class CustomerPlan
     public function plans(): array
     {
         return PackageVersion::query()->join('packages', 'packages.id', '=', 'package_versions.package_id')
-            ->where('packages.status', 'active')->whereColumn('package_versions.number', 'packages.published_version')
+            ->where('packages.status', 'active')->where('packages.type', '!=', 'topup')->whereColumn('package_versions.number', 'packages.published_version')
             ->orderBy('packages.id')->get(['package_versions.*', 'packages.name as package_name'])->map(fn ($version) => [
                 'id' => $version->package_id, 'name' => $version->definition['name'] ?? $version->package_name,
                 'type' => $version->definition['type'] ?? 'paid',

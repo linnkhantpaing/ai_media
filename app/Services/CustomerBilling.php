@@ -66,7 +66,8 @@ class CustomerBilling
         $status = $this->payments->status($payment);
         $result = ['id' => $payment->id, 'code' => 'PYT-'.str_pad((string) $payment->id, 7, '0', STR_PAD_LEFT),
             'revision' => $payment->revision, 'status' => $status, 'purpose' => $payment->purpose,
-            'package' => ['id' => $snapshot['id'], 'name' => $snapshot['name'], 'version' => $snapshot['version'], 'days' => $snapshot['definition']['validity_days']],
+            'package' => ['id' => $snapshot['id'], 'name' => $snapshot['name'], 'version' => $snapshot['version'], 'days' => $snapshot['definition']['validity_days'] ?? null,
+                'topup' => ($snapshot['type'] ?? null) === 'topup' ? ['workflow' => $snapshot['definition']['topup']['workflow'] ?? null, 'minutes' => (int) ($snapshot['definition']['topup']['minutes'] ?? 0)] : null],
             'currency' => $payment->currency, 'expected_minor' => $payment->expected_minor, 'received_minor' => $payment->received_minor,
             'method' => ['id' => $payment->payment_method_id, 'name' => $receiving['name'], 'type' => $receiving['type'], 'provider' => $receiving['provider'], 'masked_identifier' => '•••• '.mb_substr($receiving['details']['identifier'] ?? '', -4)],
             'created_at' => $payment->created_at->toIso8601String(), 'submitted_at' => $payment->submitted_at?->toIso8601String(), 'approved_at' => $payment->approved_at?->toIso8601String(),
@@ -102,7 +103,22 @@ class CustomerBilling
             ->filter(fn ($method) => ($settings['currencies'][$method->currency]['enabled'] ?? false) && $this->configuration->ready($method))
             ->map(fn ($method) => ['id' => $method->id, 'currency' => $method->currency, 'default' => $settings['currencies'][$method->currency]['default_id'] === $method->id,
                 ...$this->receiving(['name' => $method->name, 'provider' => $method->provider, 'type' => $method->type, 'details' => $method->details, 'instructions' => $method->instructions, 'qr_path' => $method->qr_path], route('account.billing.method-qr', $method->id, absolute: false))])->values();
-        $plans = Package::where('status', 'active')->where('published_version', '>', 0)->orderBy('id')->get()->map(function ($package) use ($context, $methods, $user): ?array {
+        $packages = Package::where('status', 'active')->where('published_version', '>', 0)->orderBy('id')->get();
+        $topups = $packages->map(function ($package) use ($context, $methods): ?array {
+            $definition = PackageVersion::where('package_id', $package->id)->where('number', $package->published_version)->value('definition') ?? [];
+            if (($definition['type'] ?? $package->type) !== 'topup' || ($definition['price_minor'] ?? 0) <= 0 || ! ($definition['topup']['workflow'] ?? null)) {
+                return null;
+            }
+            $blocker = $this->payments->topupBlocker($context['active'], $package->id, $definition);
+
+            return ['id' => $package->id, 'name' => $definition['name'] ?? $package->name, 'version' => $package->published_version, 'kind' => 'topup',
+                'currency' => $definition['currency'], 'price_minor' => (int) $definition['price_minor'], 'days' => null,
+                'seconds' => (int) $definition['topup']['minutes'] * 60, 'storage' => 0, 'videos' => null, 'workflow' => $definition['topup']['workflow'],
+                'purpose' => $blocker === null ? 'topup' : null, 'period' => $blocker === null ? ['starts_at' => now()->toIso8601String(), 'ends_at' => $context['active']->ends_at->toIso8601String()] : null,
+                'available' => $blocker === null && $methods->contains('currency', $definition['currency']),
+                'reason' => $blocker === null ? null : ($context['active'] && $context['active']->status() === 'active' ? 'topupNeedsWorkflow' : 'topupNeedsPlan')];
+        });
+        $plans = $packages->map(function ($package) use ($context, $methods, $user): ?array {
             $version = PackageVersion::where('package_id', $package->id)->where('number', $package->published_version)->first();
             $definition = $version?->definition ?? [];
             if (($definition['type'] ?? $package->type) !== 'paid' || ($definition['price_minor'] ?? 0) <= 0) {
@@ -111,7 +127,7 @@ class CustomerBilling
             $purpose = $this->payments->recordingPurposes($context, $package->id, $version->number)[0] ?? null;
             $plan = $purpose ? $this->payments->plan($user, $purpose, ['definition' => $definition]) : null;
 
-            return ['id' => $package->id, 'name' => $definition['name'] ?? $package->name, 'version' => $version->number,
+            return ['id' => $package->id, 'name' => $definition['name'] ?? $package->name, 'version' => $version->number, 'kind' => 'plan',
                 'currency' => $definition['currency'], 'price_minor' => (int) $definition['price_minor'], 'days' => $definition['validity_days'],
                 'seconds' => $definition['included_seconds'] ?? (($definition['included_minutes'] ?? 0) * 60),
                 'storage' => $definition['storage_bytes'] ?? 0, 'videos' => $definition['video_limit'] ?? null,
@@ -120,7 +136,7 @@ class CustomerBilling
         });
 
         return ['revision' => $settings['revision'], 'rules' => array_intersect_key($settings['rules'], array_flip(['reference_required', 'sender_required', 'transfer_date_required', 'instructions'])),
-            'plans' => $plans->filter()->values()->all(), 'methods' => $methods->all(),
+            'plans' => $plans->filter()->values()->all(), 'topups' => $topups->filter()->values()->all(), 'methods' => $methods->all(),
             'pending' => ($pending = $this->pending($user)) ? $this->present($pending) : null,
             'scheduled' => $context['scheduled']];
     }

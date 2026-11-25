@@ -1,6 +1,8 @@
 import {usePage} from '@inertiajs/react';
 import type {SharedData} from '@/types';
 const words:Record<string,readonly [string,string,string]>={
+ "notEnough": ["Not enough minutes left for this video.","ဤဗီဒီယိုအတွက် မိနစ် မလောက်ပါ။","นาทีคงเหลือไม่พอสำหรับวิดีโอนี้"],
+ "buyMinutes": ["Buy minutes","မိနစ် ထပ်ဝယ်ရန်","ซื้อนาทีเพิ่ม"],
  "estimate": [
   "Estimated charge per successful export",
   "အောင်မြင်စွာ ထုတ်ယူမှုတစ်ကြိမ်အတွက် ခန့်မှန်းနုတ်ယူမှု",
