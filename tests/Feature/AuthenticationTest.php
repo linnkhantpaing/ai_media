@@ -2,7 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Http\Middleware\HandleInertiaRequests;
 use App\Models\User;
+use App\Services\GeneralSettings;
 use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -24,7 +26,49 @@ class AuthenticationTest extends TestCase
 
     private function owner(): User
     {
-        return User::factory()->create(['email' => 'owner@example.com', 'password' => 'OwnerPassword!123']);
+        $owner = User::factory()->create(['email' => 'owner@example.com', 'password' => 'OwnerPassword!123']);
+        $this->enableMail();
+
+        return $owner;
+    }
+
+    private function enableMail(bool $enabled = true): void
+    {
+        $settings = app(GeneralSettings::class);
+        $c = $settings->current()['configuration'];
+        $c['smtp'] = ['enabled' => $enabled, 'host' => 'smtp.example.test', 'port' => 587, 'encryption' => 'tls',
+            'username' => '', 'password' => '', 'from_name' => 'ZATLAN', 'from_email' => 'sender@example.test', 'reply_to' => ''];
+        $settings->save([...$c, 'revision' => $settings->current()['revision']], [], User::factory()->create(['is_admin' => true]));
+    }
+
+    public function test_password_recovery_says_when_email_cannot_be_sent_without_revealing_accounts(): void
+    {
+        Notification::fake();
+        $owner = $this->owner();
+        $this->enableMail(false);
+
+        foreach ([$owner->email, 'unknown@example.com'] as $email) {
+            $this->post('/forgot-password', ['email' => $email])->assertSessionHas('status', 'mail_unavailable')->assertSessionHasNoErrors();
+        }
+        Notification::assertNothingSent();
+        $this->assertDatabaseCount('password_reset_tokens', 0);
+    }
+
+    public function test_form_errors_return_to_a_page_reached_by_an_in_app_link(): void
+    {
+        $this->get('/login')->assertOk();
+        $version = (string) app(HandleInertiaRequests::class)->version(request());
+        $this->withHeaders(['X-Inertia' => 'true', 'X-Inertia-Version' => $version, 'X-Requested-With' => 'XMLHttpRequest'])
+            ->get('/forgot-password')->assertOk();
+        $this->withHeaders(['X-Inertia' => 'true', 'X-Inertia-Version' => $version, 'X-Requested-With' => 'XMLHttpRequest'])
+            ->post('/forgot-password', ['email' => 'not-an-email'])->assertRedirect('/forgot-password');
+    }
+
+    public function test_an_expired_reset_link_offers_a_prefilled_request_for_a_new_one(): void
+    {
+        $this->get('/forgot-password?email=owner%40example.com')->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->component('auth/forgot-password')->where('email', 'owner@example.com'));
+        $this->get('/forgot-password?email=not-an-email')->assertInertia(fn (Assert $page) => $page->where('email', ''));
     }
 
     public function test_guests_are_redirected_to_login_and_can_view_the_login_form(): void

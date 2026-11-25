@@ -1140,3 +1140,10 @@ Supersedes the "Legacy implementation caveat" in section 8 and the "re-enable pa
 - The only two outgoing emails (password reset from Forgot password, and the admin-created account welcome / resend login information) now share one premium dark template: `App\Support\BrandedMail` + `resources/views/mail/branded.blade.php` (HTML) and `branded-text.blade.php` (plain text). Text lives in `lang/{en,my,th}/mail.php` and follows the customer's `preferred_locale`.
 - The ZATLAN logo (`resources/mail/zatlan-logo.png`, 480px copy of the brand logo) is embedded inline (CID attachment), so it shows even when `APP_URL` is local. The admin-uploaded General Settings logo is not used in email yet; name, tagline and support email/URL do come from General Settings.
 - Reset uses `ResetPassword::toMailUsing` (same class and URL builder, so existing tests and the 60-minute expiry are unchanged). Welcome keeps the `platform` mailer. Test: `BrandedMailTest`.
+
+### Password recovery flow fixes - 2026-11-25
+
+- Forgot password now checks outgoing mail (`CustomerAccounts::mailReady()`). When SMTP is off it no longer says "check your inbox" (the link was silently dropped): it shows an amber "emails can't be sent right now, contact support" notice with the General Settings support email/URL, logs a warning, and creates no token. Same answer for every address, so account existence is still not revealed.
+- An invalid/expired reset link shows "Request a new link", opening Forgot password with the email prefilled (`?email=`, validated server-side). Welcome links stay at 60 minutes (owner decision).
+- `HandleInertiaRequests::handle()` records Inertia page visits as the session "previous URL". With `Referrer-Policy: no-referrer`, Laravel's back()/validation redirects otherwise returned to the last full page load (e.g. a Forgot-password typo reached from Sign in bounced back to Sign in).
+- Known environment issue: `NameDictionaryTest` YouTube case fails with `insufficient_storage` while drive C: has ~3 GB free; not a code regression.

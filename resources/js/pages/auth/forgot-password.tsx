@@ -6,11 +6,12 @@ import CinematicLoginLayout from '@/layouts/cinematic-login-layout';
 import { useTranslations } from '@/lib/i18n';
 import type { SharedData } from '@/types';
 
-export default function ForgotPassword({ status }: { status?: 'reset_link_sent' | null }) {
-    const { links } = usePage<SharedData>().props;
+export default function ForgotPassword({ status, email = '' }: { status?: 'reset_link_sent' | 'mail_unavailable' | null; email?: string }) {
+    const { links, app } = usePage<SharedData>().props;
     const { t } = useTranslations();
-    const { data, setData, post, processing, errors } = useForm({ email: '' });
+    const { data, setData, post, processing, errors } = useForm({ email });
     const form = useRef<HTMLFormElement>(null);
+    const support = app.support_email ? { label: app.support_email, href: 'mailto:' + app.support_email } : app.support_url ? { label: app.support_url.replace(/^https?:\/\//, ''), href: app.support_url } : null;
 
     function submit(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
@@ -21,6 +22,7 @@ export default function ForgotPassword({ status }: { status?: 'reset_link_sent' 
     return <CinematicLoginLayout area="user" icon="key" title={t('resetTitle')} badge={t('forgotBadge')}>
         <Head title={t('resetTitle')} />
         {status === 'reset_link_sent' && <p className="auth-notice" role="status">{t('resetSent')}</p>}
+        {status === 'mail_unavailable' && <p className="auth-notice is-warning" role="alert">{t('mailUnavailable')}{support && <><br /><span>{t('supportContact')}: </span><a href={support.href} target={support.href.startsWith('http') ? '_blank' : undefined} rel="noopener noreferrer">{support.label}</a></>}</p>}
         <form ref={form} className="auth-form admin-login-form" onSubmit={submit} noValidate aria-busy={processing}>
             <EmailField label={t('email')} placeholder={t('emailPlaceholder')} value={data.email} onChange={event => setData('email', event.target.value)} error={errors.email} maxLength={254} required autoFocus disabled={processing} />
             <button className="auth-submit admin-submit" type="submit" disabled={processing}>

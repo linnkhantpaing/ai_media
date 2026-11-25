@@ -6,12 +6,29 @@ use App\Models\CustomerPackageAssignment;
 use App\Models\User;
 use App\Services\CustomerProfile;
 use App\Services\GeneralSettings;
+use Closure;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
 class HandleInertiaRequests extends Middleware
 {
     protected $rootView = 'app';
+
+    /**
+     * Laravel records the "previous URL" (used by back() and validation redirects) only on
+     * non-AJAX page loads, and Referrer-Policy is no-referrer, so Inertia page visits are
+     * recorded here. Otherwise a failed form reached by an in-app link returns to the page
+     * that was loaded before it (e.g. Forgot password errors landing on Sign in).
+     */
+    public function handle(Request $request, Closure $next)
+    {
+        if ($request->isMethod('GET') && $request->hasHeader('X-Inertia') && ! $request->hasHeader('X-Inertia-Partial-Data')
+            && $request->header('Purpose') !== 'prefetch' && $request->hasSession()) {
+            $request->session()->setPreviousUrl($request->fullUrl());
+        }
+
+        return parent::handle($request, $next);
+    }
 
     /** @return array<string, mixed> */
     public function share(Request $request): array

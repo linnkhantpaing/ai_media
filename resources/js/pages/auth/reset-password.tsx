@@ -40,6 +40,7 @@ export default function ResetPassword({ token, email }: { token: string; email: 
                 {rules.map(([key, ok]) => <li key={key} className={ok ? 'is-ok' : ''}><StudioIcon name={ok ? 'check' : 'close'} />{t(key)}</li>)}
             </ul>
             {errors.token && <p className="auth-field-error auth-form-error" role="alert">{errors.token}</p>}
+            {(errors.email || errors.token) && <Link className="auth-text-link auth-new-link" href={links.forgotPassword + (data.email ? '?email=' + encodeURIComponent(data.email) : '')}><AuthIcon name="mail" />{t('requestNewLink')}</Link>}
             <button className="auth-submit admin-submit" type="submit" disabled={processing}>
                 {processing ? <><span className="auth-spinner" aria-hidden="true" />{t('updatingPassword')}</> : <>{t('updatePassword')}<AuthIcon name="arrow-right" /></>}
             </button>
