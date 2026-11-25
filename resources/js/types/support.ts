@@ -1,7 +1,7 @@
 export type SupportCategory='video'|'payment'|'subscription'|'account'|'general';
 export type SupportStatus='open'|'in_progress'|'waiting_customer'|'resolved';
 export type SupportPriority='normal'|'high'|'urgent';
-export type SupportCustomer={id:number;name:string;email:string};
+export type SupportCustomer={id:number;name:string;email:string;avatar_url?:string|null};
 export type SupportRelated={id:number;type:string;code:string;title:string;status:string;url:string|null};
 export type SupportAttachment={id:string;name:string;mime:string;bytes:number;url:string};
 export type SupportMessage={id:number;kind:'reply'|'note'|'event';sender_kind:'admin'|'customer'|'system';sender:string|null;deleted:boolean;can_delete:boolean;body:string;event:Record<string,string>|null;at:string;request_id:string;read_by_customer:boolean;can_edit?:boolean;edited?:boolean;edited_at?:string|null;reply:{id:number;body:string;kind:string;deleted:boolean}|null;attachments:SupportAttachment[]};

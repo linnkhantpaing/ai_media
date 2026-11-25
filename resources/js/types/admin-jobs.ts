@@ -1,5 +1,5 @@
 import type {OperationJob} from './operations';
-export interface AdminJob extends OperationJob {customer:{id:number;name:string;email:string};retryBlocked:string|null;audioFormat:string;resultsExpired:boolean;}
+export interface AdminJob extends OperationJob {customer:{id:number;name:string;email:string;avatar_url?:string|null};retryBlocked:string|null;audioFormat:string;resultsExpired:boolean;}
 export interface AdminJobFilters {q:string;status:string;type:string;date:string;from:string;to:string;sort:string;per_page:number;page:number;}
 export interface AdminJobList {
  items:AdminJob[];counts:Record<string,number>;filters:AdminJobFilters;

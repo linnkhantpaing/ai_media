@@ -7,6 +7,7 @@ use App\Http\Requests\Admin\SaveCustomerRequest;
 use App\Models\Package;
 use App\Models\User;
 use App\Services\CustomerAccounts;
+use App\Services\CustomerProfile;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
@@ -17,6 +18,7 @@ use Illuminate\Validation\Rules\Password;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
 
 class UserAccountController extends Controller
 {
@@ -82,6 +84,11 @@ class UserAccountController extends Controller
         }
 
         return response()->json($result, $result['replayed'] ? 200 : 201);
+    }
+
+    public function avatar(int $customer, CustomerProfile $profile): SymfonyResponse
+    {
+        return $profile->avatarResponse(User::where('is_admin', false)->findOrFail($customer));
     }
 
     public function show(int $customer, CustomerAccounts $accounts): JsonResponse

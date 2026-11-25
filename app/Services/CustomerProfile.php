@@ -212,6 +212,11 @@ class CustomerProfile
         return $disk->response($user->avatar_path, 'avatar.webp', ['Content-Type' => 'image/webp', 'Cache-Control' => 'private, max-age=604800, immutable', 'X-Content-Type-Options' => 'nosniff']);
     }
 
+    public static function adminAvatarUrl(int $customerId, ?string $path): ?string
+    {
+        return $path ? route('admin.users.avatar', ['customer' => $customerId, 'v' => substr(md5($path), 0, 10)], absolute: false) : null;
+    }
+
     public function avatarUrl(User $user): ?string
     {
         return $user->avatar_path ? route('settings.preferences.avatar', ['v' => substr(md5($user->avatar_path), 0, 10)], absolute: false) : null;

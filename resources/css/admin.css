@@ -209,3 +209,5 @@
 .admin-compact-login .auth-notice { margin: 15px 0 0; padding: 8px 11px; border-radius: 10px; font-size: 10px; line-height: 1.7; text-align: center; }
 @media (max-width: 640px) { .admin-compact-login .auth-rules { gap: 4px; } .admin-compact-login .auth-rules li { padding: 2px 7px; } }
 @media (max-height: 680px) and (max-width: 640px) { .admin-compact-login { padding-top: 58px; padding-bottom: 14px; } .admin-compact-login .admin-login-card { padding-top: 20px; padding-bottom: 20px; } .admin-compact-login .admin-login-brand { margin-bottom: 9px; } .admin-compact-login .admin-login-form { margin-top: 17px; gap: 12px; } }
+.avatar-photo{display:block;width:100%;height:100%;border-radius:inherit;object-fit:cover}
+.accounts-avatar:has(.avatar-photo),.aj-avatar:has(.avatar-photo),.sp-avatar:has(.avatar-photo){overflow:hidden;padding:0;background:#1B1930}

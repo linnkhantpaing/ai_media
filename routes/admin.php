@@ -132,6 +132,7 @@ Route::prefix('admin')->name('admin.')->group(function (): void {
         Route::get('/users', [UserAccountController::class, 'index'])->name('users.index');
         Route::post('/users', [UserAccountController::class, 'store'])->middleware('throttle:30,1')->name('users.store');
         Route::post('/users/{customer}/login-information', [UserAccountController::class, 'sendLoginInformation'])->whereNumber('customer')->middleware('throttle:10,1')->name('users.login-information');
+        Route::get('/users/{customer}/avatar', [UserAccountController::class, 'avatar'])->whereNumber('customer')->middleware('throttle:600,1')->name('users.avatar');
         Route::get('/users/{customer}', [UserAccountController::class, 'show'])->whereNumber('customer')->name('users.show');
         Route::patch('/users/{customer}', [UserAccountController::class, 'update'])->whereNumber('customer')->middleware('throttle:30,1')->name('users.update');
         Route::post('/users/{customer}/action', [UserAccountController::class, 'action'])->whereNumber('customer')->middleware('throttle:30,1')->name('users.action');

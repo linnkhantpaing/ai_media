@@ -139,7 +139,7 @@ class SupportInbox
             ->where('m.kind', 'reply')->whereNull('m.deleted_at')->where('m.sender_kind', $admin ? 'customer' : 'admin')->whereRaw('m.id > COALESCE(r.last_message_id,0)');
         $last = DB::table('support_messages as lm')->select('body')->whereColumn('lm.conversation_id', 'c.id')
             ->where('lm.kind', 'reply')->orderByDesc('lm.id')->limit(1);
-        $query->select('c.*', 'u.name', 'u.email')->selectSub($unread, 'unread')->selectSub($last, 'preview')->selectSub((clone $last)->select('sender_kind'), 'preview_sender')->selectSub((clone $last)->select('deleted_at'), 'preview_deleted_at')->orderByDesc('c.id');
+        $query->select('c.*', 'u.name', 'u.email', 'u.avatar_path')->selectSub($unread, 'unread')->selectSub($last, 'preview')->selectSub((clone $last)->select('sender_kind'), 'preview_sender')->selectSub((clone $last)->select('deleted_at'), 'preview_deleted_at')->orderByDesc('c.id');
         $page = min(max(1, (int) ceil($total / 12)), (int) ($filters['page'] ?? 1));
         $records = $admin ? $query->limit(21)->get() : $query->offset(($page - 1) * 12)->limit(12)->get();
         $hasMore = $admin && $records->count() > 20;
@@ -151,7 +151,7 @@ class SupportInbox
         $rows = $records->map(fn ($row) => [
             'id' => $row->id, 'code' => $this->reference($row->id), 'subject' => $row->subject,
             'category' => $row->category, 'priority' => $row->priority, 'status' => $row->status,
-            'customer' => ['id' => $row->customer_id, 'name' => $row->name, 'email' => $row->email],
+            'customer' => ['id' => $row->customer_id, 'name' => $row->name, 'email' => $row->email, 'avatar_url' => CustomerProfile::adminAvatarUrl($row->customer_id, $row->avatar_path)],
             'unread' => (int) $row->unread, 'preview' => mb_substr($row->preview ?? '', 0, 160), 'preview_sender' => $row->preview_sender, 'preview_deleted' => $row->preview_deleted_at !== null,
             'at' => $this->iso($row->last_activity_at), 'waiting_at' => $this->iso($row->last_customer_at),
             'needs_reply' => $row->status !== 'resolved' && $row->last_customer_message_id > ($row->last_admin_reply_id ?? 0),
@@ -202,7 +202,7 @@ class SupportInbox
         return ['id' => $id, 'code' => $this->reference($id), 'subject' => $c->subject, 'category' => $c->category,
             'status' => $c->status, 'priority' => $c->priority, 'revision' => $c->revision,
             'created_at' => $this->iso($c->created_at), 'last_customer_at' => $this->iso($c->last_customer_at),
-            'customer' => ['id' => $user->id, 'name' => $user->name, 'email' => $user->email],
+            'customer' => ['id' => $user->id, 'name' => $user->name, 'email' => $user->email, 'avatar_url' => CustomerProfile::adminAvatarUrl($user->id, $user->avatar_path)],
             'messages' => $messages, 'deleted_ids' => $deletedIds, 'has_older' => $hasOlder, 'read_through' => $read,
             'changes' => $changes->count() > 120 ? [] : $this->messagePayloads($changes, $actor, $admin, $customerRead),
             'reset' => $changes->count() > 120, 'snapshot' => $snapshot->timestamp,

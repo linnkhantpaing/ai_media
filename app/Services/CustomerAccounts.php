@@ -77,7 +77,7 @@ class CustomerAccounts
 
         $displayStatus = $user->account_status !== 'active' ? $user->account_status : ($package && ($package['expired'] || $package['ended']) ? 'expired' : ($package && $package['scheduled'] ? 'scheduled' : 'active'));
 
-        return ['display_status' => $displayStatus, 'package' => $package, 'id' => $user->id, 'name' => $user->name, 'email' => $user->email, 'status' => $user->account_status, 'preferred_locale' => $user->preferred_locale ?? 'en', 'note' => $user->account_note ?? '', 'revision' => $user->account_revision, 'created_at' => $user->created_at?->toIso8601String(), 'updated_at' => $user->updated_at?->toIso8601String(), 'last_login_at' => $user->last_login_at?->toIso8601String(), 'managed' => (bool) $user->managed_account];
+        return ['display_status' => $displayStatus, 'package' => $package, 'id' => $user->id, 'name' => $user->name, 'email' => $user->email, 'avatar_url' => CustomerProfile::adminAvatarUrl($user->id, $user->avatar_path), 'status' => $user->account_status, 'preferred_locale' => $user->preferred_locale ?? 'en', 'note' => $user->account_note ?? '', 'revision' => $user->account_revision, 'created_at' => $user->created_at?->toIso8601String(), 'updated_at' => $user->updated_at?->toIso8601String(), 'last_login_at' => $user->last_login_at?->toIso8601String(), 'managed' => (bool) $user->managed_account];
     }
 
     public function mailReady(): bool

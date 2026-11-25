@@ -143,7 +143,7 @@ class AdminJobMonitor
             'hasVideo' => (bool) $this->filePath($task, 'video'), 'hasAudio' => (bool) $this->filePath($task, 'audio'), 'hasSubtitles' => (bool) $this->filePath($task, 'subtitles'),
             'audioFormat' => $task->type === 'preview' ? 'WAV' : strtoupper($task->run?->settings['output'] ?? 'wav'),
             'resultsExpired' => (bool) ($task->project->artifacts_expires_at?->isPast() && app(StorageSettings::class)->policy()['retention_enabled']),
-            'customer' => ['id' => $task->project->user_id, 'name' => $task->project->user->name, 'email' => $task->project->user->email],
+            'customer' => ['id' => $task->project->user_id, 'name' => $task->project->user->name, 'email' => $task->project->user->email, 'avatar_url' => CustomerProfile::adminAvatarUrl($task->project->user_id, $task->project->user->avatar_path)],
             'links' => ['details' => route('admin.jobs.show', $task->id, absolute: false),
                 'action' => route('admin.jobs.action', $task->id, absolute: false), 'project' => null,
                 'poster' => $link('poster'), 'video' => $link('video'), 'audio' => $link('audio'), 'subtitles' => $link('subtitles')]];

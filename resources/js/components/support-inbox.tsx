@@ -7,11 +7,12 @@ import {useDisplayDate} from '@/lib/platform-display';
 import {mediaApi,MediaApiError} from '@/lib/media-api';
 import {useToast} from '@/lib/toast';
 import type {SupportAttachment,SupportCustomer,SupportDetail,SupportOptions,SupportRelated} from '@/types/support';
+import {AvatarPhoto} from '@/components/avatar-photo';
 
 export const categoryIcons:Record<string,IconName>={video:'play',payment:'wallet',subscription:'crown',account:'key',general:'headphones'};
 export function SupportAvatar({customer,small=false}:{customer:SupportCustomer;small?:boolean}){
  const initials=customer.name.trim().split(/\s+/).slice(0,2).map(p=>Array.from(p)[0]).join('').toUpperCase();
- return <span className={'sp-avatar'+(small?' is-small':'')} style={{'--avatar-hue':(customer.id*57+240)%360} as React.CSSProperties}>{initials||'?'}</span>;
+ return <span className={'sp-avatar'+(small?' is-small':'')} style={{'--avatar-hue':(customer.id*57+240)%360} as React.CSSProperties}><AvatarPhoto src={customer.avatar_url} fallback={initials||'?'}/></span>;
 }
 export function SupportBadge({value}:{value:string}){const {t}=useSupportText();return <span className={'sp-badge is-'+value}><StudioIcon name={['active','completed','resolved','approved'].includes(value)?'check':value==='failed'?'circle-x':['high','urgent'].includes(value)?'alert':'clock'}/>{t(value==='failed'?'failedStatus':value)}</span>;}
 export function SupportPriorityMark({value}:{value:string}){

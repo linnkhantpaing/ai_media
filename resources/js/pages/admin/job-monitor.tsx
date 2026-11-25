@@ -15,13 +15,14 @@ import {useLoading} from '@/lib/loading';
 import {useToast} from '@/lib/toast';
 import type {AdminJob,AdminJobDetails,AdminJobFilters,AdminJobList} from '@/types/admin-jobs';
 import '../../../css/admin-job-monitor.css';
+import {AvatarPhoto} from '@/components/avatar-photo';
 
 const summaries:[string,string,IconName,string][]=[
  ['','all','layers','primary'],['queued','queued','hourglass','warning'],['running','running','triangle-play','info'],
  ['completed','completed','check','success'],['failed','failed','circle-x','danger'],['cancelled','cancelled','ban','neutral']
 ];
 const initials=(name:string)=>name.trim().split(/\s+/u).slice(0,2).map(w=>Array.from(w)[0]??'').join('').toUpperCase();
-function Customer({job}:{job:AdminJob}){return <div className="aj-customer"><span className={'aj-avatar hue-'+job.customer.id%4}>{initials(job.customer.name)}</span><span><strong>{job.customer.name}</strong><small>{job.customer.email}</small></span></div>;}
+function Customer({job}:{job:AdminJob}){return <div className="aj-customer"><span className={'aj-avatar hue-'+job.customer.id%4}><AvatarPhoto src={job.customer.avatar_url} fallback={initials(job.customer.name)}/></span><span><strong>{job.customer.name}</strong><small>{job.customer.email}</small></span></div>;}
 function Progress({job,date}:{job:AdminJob;date:(v:string|null)=>string}){
  const {t}=useAdminJobsText();const {error}=useMediaText();const stage=useOpsStage();
  const label=job.status==='queued'?t('waiting'):job.status==='retry_waiting'?(job.nextRetryAt?t('retryAt')+' '+date(job.nextRetryAt):t('retry_waiting')):job.status==='awaiting_review'?t('reviewWait'):job.status==='failed'?error(job.errorCode??'processing_failed'):job.status==='completed'?t('completed'):job.status==='cancelled'?t('cancelled'):job.status==='stopping'?t('stopping'):stage(job.stage);

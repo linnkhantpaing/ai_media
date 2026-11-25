@@ -61,7 +61,7 @@ class Subscriptions
 
         return [
             'id' => $assignment->id, 'code' => 'SUB-'.str_pad((string) $assignment->id, 6, '0', STR_PAD_LEFT),
-            'customer' => ['id' => $user->id, 'name' => $user->name, 'email' => $user->email, 'status' => $user->account_status],
+            'customer' => ['id' => $user->id, 'name' => $user->name, 'email' => $user->email, 'avatar_url' => CustomerProfile::adminAvatarUrl($user->id, $user->avatar_path), 'status' => $user->account_status],
             'revision' => $user->account_revision,
             'package' => ['id' => $assignment->package_id, 'name' => $snapshot['name'], 'code' => $snapshot['code'], 'version' => $snapshot['version'], 'type' => $snapshot['type'] ?? $definition['type'] ?? 'paid', 'definition' => array_diff_key($definition, ['note' => true])],
             'starts_at' => $assignment->starts_at->toIso8601String(), 'ends_at' => $assignment->ends_at->toIso8601String(),

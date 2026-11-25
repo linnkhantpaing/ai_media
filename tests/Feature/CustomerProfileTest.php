@@ -112,6 +112,14 @@ class CustomerProfileTest extends TestCase
         $this->assertSame([], Storage::disk('local')->allFiles('avatars'));
         $this->get('/settings/preferences/avatar')->assertOk()->assertHeader('Content-Type', 'image/webp');
         $this->get('/projects')->assertInertia(fn (Assert $page) => $page->where('auth.user.avatar_url', fn (?string $url) => $url !== null));
+        $adminUrl = '/admin/users/'.$this->customer->id.'/avatar';
+        $this->get($adminUrl)->assertRedirect();
+        $admin = User::factory()->create(['is_admin' => true]);
+        $this->actingAs($admin, 'admin')->get('/admin/users')->assertInertia(fn (Assert $page) => $page
+            ->where('accounts.users.0.avatar_url', fn (?string $url) => str_starts_with((string) $url, $adminUrl.'?v=')));
+        $this->get($adminUrl)->assertOk()->assertHeader('Content-Type', 'image/webp');
+        $this->get('/admin/users/'.$admin->id.'/avatar')->assertNotFound();
+        $this->actingAs($this->customer);
 
         $this->deleteJson('/settings/preferences/photo')->assertOk()->assertJsonPath('preferences.profile.avatar_url', null);
         Storage::disk('r2')->assertMissing($path);
