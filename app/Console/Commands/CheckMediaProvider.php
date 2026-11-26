@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Exceptions\MediaFailure;
+use App\Services\AiUsage;
 use App\Services\Media\GeminiClient;
 use App\Services\Media\MediaRuntime;
 use Illuminate\Console\Command;
@@ -18,6 +19,7 @@ class CheckMediaProvider extends Command
 
     public function handle(GeminiClient $gemini, MediaRuntime $runtime): int
     {
+        app(AiUsage::class)->begin(null, null, 'check');
         $directory = 'checks/'.Str::uuid();
         try {
             $result = $gemini->translate([['index' => 0, 'start' => 0, 'end' => 4, 'source_text' => 'Hello. Welcome to our video studio.']], 'A short studio greeting.');

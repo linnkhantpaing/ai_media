@@ -38,6 +38,7 @@ export const adminNavigation: AdminMenuGroup[] = [
         items: [
             { key: 'revenue', icon: 'chart', label: { en: 'Revenue', my: 'ဝင်ငွေ အစီရင်ခံစာ', th: 'รายได้' } },
             { key: 'usageReports', icon: 'activity', label: { en: 'Usage & Processing', my: 'အသုံးပြုမှုနှင့် လုပ်ဆောင်မှု', th: 'การใช้งานและประมวลผล' } },
+            { key: 'aiCosts', icon: 'wallet', label: { en: 'AI & Storage Costs', my: 'AI နှင့် Storage ကုန်ကျစရိတ်', th: 'ต้นทุน AI และพื้นที่จัดเก็บ' } },
         ],
     },
     {

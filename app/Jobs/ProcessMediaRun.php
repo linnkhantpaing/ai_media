@@ -6,6 +6,7 @@ use App\Exceptions\MediaAnalysisDeferred;
 use App\Exceptions\MediaFailure;
 use App\Models\MediaProject;
 use App\Models\MediaRun;
+use App\Services\AiUsage;
 use App\Services\CustomerAccounts;
 use App\Services\Media\MediaPipeline;
 use App\Services\Media\OperationsTelemetry;
@@ -49,6 +50,7 @@ class ProcessMediaRun implements ShouldBeUnique, ShouldQueue
             return;
         }
         $project = MediaProject::find($run->media_project_id);
+        app(AiUsage::class)->begin($project, $run, $run->phase);
         if (! $project || ! app(CustomerAccounts::class)->canProcess($project->user_id)) {
             $this->finish($run, 'failed', 'account_unavailable');
 

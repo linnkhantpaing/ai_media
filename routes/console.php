@@ -1,5 +1,6 @@
 <?php
 
+use App\Services\AiUsage;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Cache;
@@ -15,3 +16,6 @@ Schedule::command('media:cleanup --scheduled')->hourly()->withoutOverlapping(60)
 Schedule::command('usage:reconcile')->everyFiveMinutes()->withoutOverlapping(10);
 
 Schedule::command('notifications:sync')->everyMinute()->withoutOverlapping(5);
+
+// AI cost report: keep each Gemini call for 90 days, then roll it into permanent daily totals.
+Schedule::call(fn () => app(AiUsage::class)->prune())->dailyAt('03:15')->name('ai-usage-prune')->withoutOverlapping(30);

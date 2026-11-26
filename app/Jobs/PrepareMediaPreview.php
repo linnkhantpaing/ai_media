@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Exceptions\MediaFailure;
 use App\Models\MediaPreview;
 use App\Models\MediaProject;
+use App\Services\AiUsage;
 use App\Services\CustomerAccounts;
 use App\Services\Media\MediaPreviews;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
@@ -39,6 +40,7 @@ class PrepareMediaPreview implements ShouldBeUnique, ShouldQueue
             return;
         }
         $project = MediaProject::find($preview->media_project_id);
+        app(AiUsage::class)->begin($project, null, 'preview');
         if (! $project || ! app(CustomerAccounts::class)->canProcess($project->user_id)) {
             $preview->update(['status' => 'failed', 'error_code' => 'account_unavailable']);
 

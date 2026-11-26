@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Exceptions\MediaFailure;
 use App\Http\Requests\SaveProviderSettingsRequest;
+use App\Services\AiUsage;
 use App\Services\Media\AutomaticMediaWorker;
 use App\Services\Media\GeminiClient;
 use App\Services\Media\MediaBackground;
@@ -60,6 +61,7 @@ class ProviderSettingsController extends Controller
         $sample = null;
         try {
             $this->settings->withConfiguration($configuration, function () use ($gemini, $runtime, $capability, $configuration, $relative, &$sample): void {
+                app(AiUsage::class)->begin(null, null, 'check');
                 if ($capability === 'speech') {
                     Storage::disk('local')->makeDirectory(dirname($relative));
                     $file = Storage::disk('local')->path($relative);

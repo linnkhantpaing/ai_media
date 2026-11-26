@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Exceptions\MediaFailure;
 use App\Models\User;
+use App\Services\AiUsage;
 use App\Services\CustomerProfile;
 use App\Services\Media\GeminiClient;
 use App\Services\Media\ProviderSettings;
@@ -130,12 +131,13 @@ class PreferencesController extends Controller
         $disk = Storage::disk('local');
         if (! $disk->exists($path)) {
             try {
-                Cache::lock('voice-sample:'.$path, 60)->block(45, function () use ($disk, $path, $gemini, $data): void {
+                Cache::lock('voice-sample:'.$path, 60)->block(45, function () use ($disk, $path, $gemini, $data, $request): void {
                     if ($disk->exists($path)) {
                         return;
                     }
                     $disk->makeDirectory('voice-samples');
                     $temporary = $path.'.part';
+                    app(AiUsage::class)->begin(null, null, 'voice_sample', $request->user()->id);
                     $gemini->speech(self::SAMPLES[$data['lang']], $data['voice'], 'Warm, clear narration for a short sample.', $disk->path($temporary), $data['lang']);
                     $disk->move($temporary, $path);
                 });

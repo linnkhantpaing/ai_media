@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Admin\AiCostController;
 use App\Http\Controllers\Admin\AuditController;
 use App\Http\Controllers\Admin\AuthenticatedSessionController;
 use App\Http\Controllers\Admin\DashboardController;
@@ -47,6 +48,9 @@ Route::prefix('admin')->name('admin.')->group(function (): void {
         Route::get('/reports/usage-processing', [ProcessingReportController::class, 'index'])->name('processing.index');
         Route::get('/reports/usage-processing/export', [ProcessingReportController::class, 'export'])->middleware('throttle:10,1')->name('processing.export');
         Route::get('/reports/usage-processing/customers/{customer}', [ProcessingReportController::class, 'show'])->whereNumber('customer')->name('processing.show');
+        Route::get('/reports/ai-costs', [AiCostController::class, 'index'])->name('costs.index');
+        Route::get('/reports/ai-costs/projects/{project}', [AiCostController::class, 'project'])->whereUuid('project')->middleware('throttle:60,1')->name('costs.project');
+        Route::put('/reports/ai-costs/settings', [AiCostController::class, 'saveSettings'])->middleware('throttle:20,1')->name('costs.settings');
         Route::get('/reports/revenue', [RevenueController::class, 'index'])->name('revenue.index');
         Route::get('/reports/revenue/export', [RevenueController::class, 'export'])->middleware('throttle:10,1')->name('revenue.export');
         Route::get('/reports/revenue/{type}/{entry}', [RevenueController::class, 'show'])->whereIn('type', ['payment', 'refund'])->whereNumber('entry')->name('revenue.show');

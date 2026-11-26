@@ -14,6 +14,7 @@ use App\Models\PaymentTransaction;
 use App\Models\UsageEvent;
 use App\Models\User;
 use App\Services\AdminNotifications;
+use App\Services\AiUsage;
 use App\Services\AuditTrail;
 use App\Services\CustomerNotifications;
 use App\Services\Media\ProviderSettings;
@@ -30,6 +31,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
@@ -41,10 +43,15 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->app->singleton(ProviderSettings::class);
         $this->app->singleton(StorageSettings::class);
+        $this->app->singleton(AiUsage::class);
     }
 
     public function boot(): void
     {
+        // A queue worker runs many jobs in one process: never let one job's AI usage context leak into the next.
+        Queue::before(fn () => app(AiUsage::class)->reset());
+        Queue::after(fn () => app(AiUsage::class)->reset());
+        Queue::failing(fn () => app(AiUsage::class)->reset());
 
         foreach ([CustomerAccountEvent::class, PackageEvent::class, PaymentEvent::class,
             PaymentConfigurationEvent::class, MediaTaskAction::class, UsageEvent::class] as $model) {
