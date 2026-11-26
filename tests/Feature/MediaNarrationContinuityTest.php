@@ -49,6 +49,26 @@ class MediaNarrationContinuityTest extends TestCase
         Http::assertSentCount(2);
     }
 
+    public function test_audio_running_past_the_last_video_frame_still_exports(): void
+    {
+        // Video ends at 9.9 s but audio runs to 10.0 s, and one scene starts after the last frame.
+        $project = MediaProject::factory()->create(['storage_disk' => 'local', 'metadata' => ['duration' => 10, 'width' => 160, 'height' => 120, 'audio' => true], 'lines' => [
+            ['index' => 0, 'start' => 0, 'end' => 4.5, 'text' => 'The first scene.', 'included' => true],
+            ['index' => 1, 'start' => 5, 'end' => 9.5, 'text' => 'The second scene.', 'included' => true],
+            ['index' => 2, 'start' => 9.92, 'end' => 9.99, 'text' => 'A last word.', 'included' => true],
+        ]]);
+        Storage::disk('local')->makeDirectory(dirname($project->source_path));
+        app(MediaRuntime::class)->execute('ffmpeg', ['-v', 'error', '-y', '-f', 'lavfi', '-t', '9.9', '-i', 'color=c=blue:s=160x120:r=30', '-f', 'lavfi', '-t', '10', '-i', 'sine=frequency=880:sample_rate=48000',
+            '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-threads', '2', Storage::disk('local')->path($project->source_path)]);
+        $this->voiceFixture('if(between(t,0.1,0.5),0.14*sin(2*PI*660*t),0)', 0.6);
+
+        [$file] = $this->render($project, MediaSettings::normalize(['mode' => 'dub', 'workflow' => 'translate', 'burn_subtitles' => false]));
+
+        $streams = collect(app(MediaRuntime::class)->probe($file)['streams'] ?? []);
+        $this->assertNotNull($streams->firstWhere('codec_type', 'video'));
+        $this->assertNotNull($streams->firstWhere('codec_type', 'audio'));
+    }
+
     public function test_background_mix_reaches_video_and_audio_exports_without_original_dialogue(): void
     {
         $project = $this->project();

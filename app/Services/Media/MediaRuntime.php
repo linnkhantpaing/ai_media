@@ -3,6 +3,7 @@
 namespace App\Services\Media;
 
 use App\Exceptions\MediaFailure;
+use Illuminate\Support\Facades\Log;
 use Symfony\Component\Process\Exception\ProcessTimedOutException;
 use Symfony\Component\Process\Process;
 
@@ -71,6 +72,9 @@ class MediaRuntime
             }
         }
         if (! $process->isSuccessful()) {
+            // Keep the tool's own message for diagnosis; customers still see the generic code.
+            Log::warning('Media tool failed.', ['tool' => $tool, 'exit_code' => $process->getExitCode(),
+                'error' => mb_substr(trim(preg_replace('/^(?:frame|fps|stream_|bitrate|total_size|out_time|dup_frames|drop_frames|speed|progress)=.*$/m', '', $process->getErrorOutput()) ?? ''), -1500)]);
             throw new MediaFailure('invalid_media');
         }
 

@@ -138,7 +138,11 @@ class MediaRenderer
             $cursor = $line['end'];
             $progress((int) floor(($lineIndex + 1) / count($included) * 50));
         }
-        $tail = $run->project->metadata['duration'] - $cursor;
+        // Audio often runs a little past the last video frame (e.g. video 57.90 s, audio 57.98 s).
+        // A piece that starts after the last frame has no picture to encode, so the tail stops at the
+        // last frame and any scene starting after it shows a held last frame instead.
+        $videoEnd = $audioOnly ? null : $this->videoEnd($source, (float) $run->project->metadata['duration']);
+        $tail = min((float) $run->project->metadata['duration'], $videoEnd ?? PHP_FLOAT_MAX) - $cursor;
         if ($settings['workflow'] !== 'movie' && $tail > 0.04) {
             $pieces[] = ['start' => $cursor, 'length' => $tail, 'duration' => $tail, 'voice' => null, 'muted' => $allAudioMuted];
         }
@@ -154,7 +158,9 @@ class MediaRenderer
 
                 continue;
             }
-            $args = ['-nostdin', '-v', 'error', '-y', '-ss', (string) $piece['start'], '-t', (string) $piece['length'], '-i', $source];
+            $held = $videoEnd !== null && $piece['start'] > $videoEnd - 0.05;
+            $videoStart = $held ? max(0.0, $videoEnd - 0.1) : $piece['start'];
+            $args = ['-nostdin', '-v', 'error', '-y', '-ss', (string) $videoStart, '-t', (string) ($held ? 0.1 : $piece['length']), '-i', $source];
             if ($piece['voice']) {
                 array_push($args, '-i', $piece['voice']);
             } else {
@@ -163,7 +169,9 @@ class MediaRenderer
             if ($background) {
                 array_push($args, '-ss', (string) MediaBackground::offset($backgroundRanges, (float) $piece['start']), '-t', (string) $piece['length'], '-i', $background);
             }
-            $filter = ($audioOnly ? '' : '[0:v]setpts=(PTS-STARTPTS)*'.($piece['duration'] / $piece['length']).',fps=30,scale=trunc(iw/2)*2:trunc(ih/2)*2,setsar=1,tpad=stop_mode=clone:stop_duration=0.1[v];').'[1:a]'.($piece['voice'] ? app(MediaVoices::class)->sceneFilter($piece['voice_duration'], $piece['duration'], $settings) : $this->tempo(1)).',volume='.($piece['voice'] && ! ($piece['muted'] ?? false) ? $settings['voice_volume'] : 0).',aresample=48000,aformat=channel_layouts=stereo,apad,atrim=duration='.$piece['duration'].'[a1]';
+            $filter = ($audioOnly ? '' : ($held
+                ? '[0:v]setpts=PTS-STARTPTS,fps=30,scale=trunc(iw/2)*2:trunc(ih/2)*2,setsar=1,tpad=stop_mode=clone:stop_duration='.($piece['duration'] + 0.1).'[v];'
+                : '[0:v]setpts=(PTS-STARTPTS)*'.($piece['duration'] / $piece['length']).',fps=30,scale=trunc(iw/2)*2:trunc(ih/2)*2,setsar=1,tpad=stop_mode=clone:stop_duration=0.1[v];')).'[1:a]'.($piece['voice'] ? app(MediaVoices::class)->sceneFilter($piece['voice_duration'], $piece['duration'], $settings) : $this->tempo(1)).',volume='.($piece['voice'] && ! ($piece['muted'] ?? false) ? $settings['voice_volume'] : 0).',aresample=48000,aformat=channel_layouts=stereo,apad,atrim=duration='.$piece['duration'].'[a1]';
             if ($background) {
                 $filter .= ';[2:a]'.$this->tempo($piece['length'] / $piece['duration']).',volume='.(($piece['muted'] ?? false) ? 0 : $settings['background_volume']).',aresample=48000,aformat=channel_layouts=stereo,apad[bg]';
                 if ($settings['duck_background'] && $piece['voice']) {
@@ -190,6 +198,19 @@ class MediaRenderer
         ], directory: $directory, timeout: 180, cancelled: $cancelled, progress: fn (int $percent) => $progress(95 + (int) floor($percent * 0.05)), duration: $timeline + max(0, $settings['workflow'] !== 'movie' ? $tail : 0));
 
         return [$combined, $translated];
+    }
+
+    /** Time of the last video frame (falls back to the container duration when the stream has none). */
+    private function videoEnd(string $source, float $fallback): float
+    {
+        try {
+            $video = collect($this->runtime->probe($source)['streams'] ?? [])->firstWhere('codec_type', 'video');
+            $end = (float) ($video['duration'] ?? 0);
+
+            return $end > 0 ? $end : $fallback;
+        } catch (MediaFailure) {
+            return $fallback;
+        }
     }
 
     public static function sceneDuration(array $line, array $settings, float $voiceDuration): float
