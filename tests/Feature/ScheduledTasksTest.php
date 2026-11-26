@@ -118,6 +118,24 @@ class ScheduledTasksTest extends TestCase
         $this->actingAs($customer)->postJson('/admin/operations/schedules/usage/run', ['confirm' => true])->assertUnauthorized();
     }
 
+    public function test_runs_missed_while_cron_was_down_are_not_late_but_later_misses_are(): void
+    {
+        $this->travelTo(now()->setTime(10, 0, 30));
+        $tasks = app(ScheduledTasks::class);
+        $tasks->tick();
+        $tasks->run('usage');
+        // Cron stops for 20 minutes, then starts again: the missed 10:05–10:20 slots are not "late".
+        $this->travelTo(now()->setTime(10, 21, 0));
+        $tasks->tick();
+        $this->assertSame('success', $this->task($tasks->overview(), 'usage')['state']);
+        // Cron keeps running but the 10:25 run never happens: that is late.
+        foreach (range(22, 28) as $minute) {
+            $this->travelTo(now()->setTime(10, $minute, 0));
+            $tasks->tick();
+        }
+        $this->assertSame('late', $this->task($tasks->overview(), 'usage')['state']);
+    }
+
     public function test_old_history_is_pruned_after_the_keep_period(): void
     {
         ScheduledTaskRun::create(['task' => 'usage', 'trigger' => 'schedule', 'status' => 'success', 'created_at' => now()->subDays(ScheduledTasks::KEEP_DAYS + 1)]);

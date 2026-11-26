@@ -46,10 +46,15 @@ class ScheduledTasks
     public function tick(): void
     {
         $now = now()->toIso8601String();
+        $previous = Cache::get('scheduler:last-tick');
         // Older key read by Storage & Retention ("automatic cleanup is set up").
         Cache::put('media-cleanup-scheduler', $now, self::STALE_SECONDS);
         Cache::forever('scheduler:last-tick', $now);
-        Cache::add('scheduler:first-tick', $now, now()->addYears(5));
+        // Cron (re)started: due times missed while it was down are the cron's fault, shown by the
+        // scheduler card, so a task only counts as "late" for due times after this moment.
+        if (! $previous || CarbonImmutable::parse($previous)->lt(now()->subSeconds(self::STALE_SECONDS))) {
+            Cache::forever('scheduler:first-tick', $now);
+        }
         if (Cache::add('scheduler:history-pruned', true, 86400)) {
             ScheduledTaskRun::where('created_at', '<', now()->subDays(self::KEEP_DAYS))->delete();
         }
