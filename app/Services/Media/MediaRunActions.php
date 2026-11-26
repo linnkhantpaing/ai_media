@@ -22,10 +22,14 @@ class MediaRunActions
         $runId = DB::transaction(function () use ($project, $expectedRun, $expectedPhase): string {
             $project = MediaProject::lockForUpdate()->findOrFail($project->id);
             $run = MediaRun::lockForUpdate()->find($project->active_run_id);
-            if (! $run || $run->status !== 'failed' || $project->busy()
+            if ($project->busy()) {
+                throw new MediaFailure('project_busy');
+            }
+            // A run the customer cancelled can be started again just like a failed one.
+            if (! $run || ! in_array($run->status, ['failed', 'cancelled'], true)
                 || ($expectedRun !== null && $run->id !== $expectedRun)
                 || ($expectedPhase !== null && $run->phase !== $expectedPhase)) {
-                throw new MediaFailure('project_busy');
+                throw new MediaFailure('retry_unavailable');
             }
             if (! app(ProviderSettings::class)->withRevision($run->provider_revision_id, fn (): bool => app(ProviderSettings::class)->ready())) {
                 throw new MediaFailure('ai_key_missing');

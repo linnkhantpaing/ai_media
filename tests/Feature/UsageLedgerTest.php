@@ -14,6 +14,7 @@ use App\Models\UsageRecord;
 use App\Models\User;
 use App\Services\Media\MediaRunActions;
 use App\Services\Media\MediaRuntime;
+use App\Services\Media\ProviderSettings;
 use App\Services\UsageLedger;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -316,6 +317,30 @@ class UsageLedgerTest extends TestCase
         (new ProcessMediaRun($other->id))->failed(null);
         $this->assertSame('failed', $other->fresh()->status);
         $this->assertSame('released', UsageRecord::where('media_run_id', $other->id)->sole()->status);
+    }
+
+    public function test_a_cancelled_render_can_be_retried_and_reserves_its_record_again(): void
+    {
+        Queue::fake();
+        [$u] = $this->customer();
+        $run = $this->makeRun($u);
+        $run->update(['phase' => 'generate', 'status' => 'queued']);
+        $run->project->update(['status' => 'queued']);
+        $this->ledger->reserve($run);
+        app(MediaRunActions::class)->cancel($run->project->fresh());
+        $this->assertSame('cancelled', $run->fresh()->status);
+        $this->mock(MediaRuntime::class, fn ($mock) => $mock->shouldReceive('available')->andReturn(true));
+        $this->partialMock(ProviderSettings::class, fn ($mock) => $mock->shouldReceive('withRevision')->andReturn(true));
+
+        $this->actingAs($u, 'web')->postJson('/media/projects/'.$run->media_project_id.'/retry')->assertAccepted();
+        $this->assertSame(['queued', false], [$run->fresh()->status, (bool) $run->fresh()->cancel_requested]);
+        $this->assertSame('reserved', UsageRecord::where('media_run_id', $run->id)->sole()->status);
+        Queue::assertPushed(ProcessMediaRun::class);
+
+        // Retrying something that is neither failed nor cancelled explains itself instead of claiming it is busy.
+        $run->update(['status' => 'completed']);
+        $run->project->update(['status' => 'completed']);
+        $this->postJson('/media/projects/'.$run->media_project_id.'/retry')->assertConflict()->assertJsonPath('code', 'retry_unavailable');
     }
 
     public function test_upload_reservations_and_confirmed_storage_respect_customer_storage_cap(): void

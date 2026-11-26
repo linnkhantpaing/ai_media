@@ -326,7 +326,7 @@ class MediaProjectController extends Controller
         try {
             app(MediaRunActions::class)->retry($project);
         } catch (MediaFailure $failure) {
-            $this->error($failure->reason, $failure->reason === 'project_busy' ? 409 : 503);
+            $this->error($failure->reason, in_array($failure->reason, ['project_busy', 'retry_unavailable'], true) ? 409 : 503);
         }
 
         return response()->json(['project' => $this->data($project->fresh())], 202);

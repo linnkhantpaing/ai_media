@@ -41,7 +41,7 @@ class JobMonitorController extends Controller
         try {
             $result = $monitor->act($request->user('admin'), $mediaTask, $input);
         } catch (MediaFailure $failure) {
-            return response()->json(['code' => $failure->reason], $failure->reason === 'project_busy' ? 409 : 422);
+            return response()->json(['code' => $failure->reason], in_array($failure->reason, ['project_busy', 'retry_unavailable'], true) ? 409 : 422);
         } catch (LockTimeoutException) {
             return response()->json(['code' => 'project_busy'], 409);
         }
