@@ -285,16 +285,11 @@ html[lang="my"] .studio-nav-link { line-height: 2; }
 .sidebar-is-collapsed .studio-sidebar .studio-plan-footer>.studio-footer-icon{display:grid}
 .spf-usage{display:flex;align-items:baseline;gap:3px}.spf-usage small{margin-left:auto;padding-left:6px;font-weight:700;color:var(--text-secondary)}
 
-/* Raised 3D sidebar: a floating panel with soft depth instead of a flat edge line */
+/* Sidebar keeps its full-height edge; its right edge casts a soft shadow so the menu looks raised above the page. */
 @media (min-width: 640px) {
-    .studio-sidebar { inset: 10px auto 10px 10px; border: 0; border-radius: 20px;
-        background: linear-gradient(165deg, color-mix(in srgb, var(--sidebar) 88%, #B8A8FF 5%), var(--sidebar) 42%, color-mix(in srgb, var(--sidebar) 94%, #000 6%));
-        box-shadow: 0 22px 48px #0000007a, 0 6px 14px #00000052, inset 0 1px 0 color-mix(in srgb, #FFFFFF 9%, transparent), inset 0 -1px 0 #0000004d, 0 0 0 1px color-mix(in srgb, var(--primary) 12%, transparent); }
-    .studio-main { margin-left: calc(var(--sidebar-width) + 20px); }
-    .studio-sidebar .studio-brand-row { border-bottom-color: color-mix(in srgb, var(--border) 60%, transparent); }
-    .studio-sidebar .studio-sidebar-footer { border-top-color: color-mix(in srgb, var(--border) 60%, transparent); }
+    .studio-sidebar { border-right: 0; box-shadow: inset -1px 0 0 color-mix(in srgb, #FFFFFF 6%, transparent), 1px 0 0 #00000066, 6px 0 18px #00000059, 14px 0 34px #00000033; }
 }
-[data-theme="light"] .studio-sidebar { box-shadow: 0 18px 40px #1b143a26, 0 4px 10px #1b143a14, inset 0 1px 0 #FFFFFFcc, 0 0 0 1px color-mix(in srgb, var(--primary) 14%, transparent); }
+[data-theme="light"] .studio-sidebar { box-shadow: inset -1px 0 0 #FFFFFFb3, 1px 0 0 color-mix(in srgb, var(--border) 80%, transparent), 6px 0 18px #1b143a1f, 14px 0 34px #1b143a12; }
 
 /* Phones: language, queue and support sit together with the bell on the second header row */
 @media (max-width: 639px) {
