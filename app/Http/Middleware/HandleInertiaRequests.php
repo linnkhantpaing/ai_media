@@ -6,6 +6,7 @@ use App\Models\CustomerPackageAssignment;
 use App\Models\User;
 use App\Services\CustomerProfile;
 use App\Services\GeneralSettings;
+use App\Services\UsageLedger;
 use Closure;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
@@ -90,12 +91,16 @@ class HandleInertiaRequests extends Middleware
     private function planBadge(User $user): array
     {
         $assignment = CustomerPackageAssignment::current()->where('user_id', $user->id)->first();
+        $used = app(UsageLedger::class)->storageBytes($user->id);
         if (! $assignment) {
-            return ['name' => null, 'status' => 'none', 'days_left' => 0];
+            return ['name' => null, 'type' => null, 'status' => 'none', 'days_left' => 0, 'ends_at' => null, 'storage' => ['used' => $used, 'total' => null]];
         }
         $status = $assignment->status();
+        $snapshot = $assignment->effectiveSnapshot();
 
-        return ['name' => $assignment->effectiveSnapshot()['name'] ?? null, 'status' => $status,
-            'days_left' => $status === 'active' ? max(0, (int) ceil(now()->diffInDays($assignment->ends_at, false))) : 0];
+        return ['name' => $snapshot['name'] ?? null, 'type' => $snapshot['type'] ?? ($snapshot['definition']['type'] ?? 'paid'), 'status' => $status,
+            'days_left' => $status === 'active' ? max(0, (int) ceil(now()->diffInDays($assignment->ends_at, false))) : 0,
+            'ends_at' => $assignment->ends_at->toIso8601String(),
+            'storage' => ['used' => $used, 'total' => isset($snapshot['definition']['storage_bytes']) ? (int) $snapshot['definition']['storage_bytes'] : null]];
     }
 }

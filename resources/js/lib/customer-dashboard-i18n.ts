@@ -154,6 +154,7 @@ const words={
  hide:['Hide','ဖျောက်ရန်','ซ่อน'],
  couldntLoad:["Couldn't load",'မဖွင့်နိုင်ပါ','โหลดไม่สำเร็จ'],
  planFooter:['{name} Plan','{name} Plan','แพ็กเกจ {name}'],
+ sf_storage:['Storage Usage','Storage အသုံးပြုမှု','การใช้พื้นที่'],sf_left:['{size} left','{size} ကျန်','เหลือ {size}'],sf_free:['Free','Free','ฟรี'],sf_noPlan:['No plan','Plan မရှိ','ไม่มีแพ็กเกจ'],sf_expired:['Expired','သက်တမ်းကုန်','หมดอายุ'],sf_upcoming:['Starts soon','မကြာမီ စမည်','เริ่มเร็วๆ นี้'],sf_hours:['{n} h left','{n} နာရီ ကျန်','เหลือ {n} ชม.'],sf_full:['Storage full','Storage ပြည့်ပြီ','พื้นที่เต็ม'],
 } as const;
 
 export type DashboardWord=keyof typeof words;

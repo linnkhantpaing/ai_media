@@ -97,14 +97,28 @@ function Sidebar({ frame, mobile = false, adminArea = false, adminPage = 'dashbo
 }
 
 
-/** Customer sidebar footer: current plan with its state, linking to My Plan. */
+/** Customer sidebar footer: storage used against the plan quota, the plan name and the time left, linking to My Plan. */
 function PlanFooter({ badge, href, onNavigate }: { badge: NonNullable<SharedData['planBadge']>; href: string; onNavigate: () => void }) {
-    const { t } = useDashboardText();
-    const status = badge.status === 'active' ? t('p_active') + ' · ' + (badge.days_left > 0 ? t('daysLeft', { n: badge.days_left }) : t('dayLeft')) : badge.status === 'upcoming' ? t('p_upcoming') : badge.name ? t('p_expired') : t('choosePlan');
-    const title = badge.name ? t('planFooter', { name: badge.name }) : t('noPlan');
-    return <Link href={href} className={'studio-footer-row studio-plan-footer is-' + (badge.status === 'active' ? 'active' : badge.name ? 'ended' : 'none')} title={title + ' · ' + status} onClick={onNavigate}>
-        <span className="studio-footer-icon"><StudioIcon name="crown" /></span>
-        <div><strong>{title}</strong><small>{status}</small></div>
+    const { t, number, language } = useDashboardText();
+    const used = badge.storage?.used ?? 0;
+    const total = badge.storage?.total ?? null;
+    const share = total ? Math.min(100, (used / total) * 100) : 0;
+    const size = (bytes: number) => { const units = ['B', 'KB', 'MB', 'GB', 'TB']; let value = bytes; let unit = 0; while (value >= 1024 && unit < units.length - 1) { value /= 1024; unit++; } return number(value, value < 10 && unit > 0 ? 2 : 1) + ' ' + units[unit]; };
+    const chip = badge.status === 'none' ? t('sf_noPlan') : badge.type === 'trial' ? t('sf_free') : badge.name ?? t('sf_free');
+    const ends = badge.ends_at ? new Date(badge.ends_at) : null;
+    const hours = ends ? Math.max(0, Math.ceil((ends.getTime() - Date.now()) / 3600000)) : 0;
+    const time = badge.status === 'active' ? (hours < 24 ? t('sf_hours', { n: hours }) : t('daysLeft', { n: badge.days_left })) : badge.status === 'upcoming' ? t('sf_upcoming') : badge.status === 'none' ? t('choosePlan') : t('sf_expired');
+    const date = ends && badge.status === 'active' ? new Intl.DateTimeFormat(language, { month: 'short', day: 'numeric' }).format(ends) : null;
+    const tone = share >= 90 ? 'is-full' : share >= 70 ? 'is-high' : '';
+    const state = badge.status === 'active' ? 'active' : badge.name ? 'ended' : 'none';
+    return <Link href={href} className={'studio-footer-row studio-plan-footer is-' + state} title={t('sf_storage') + ' · ' + size(used) + (total ? ' / ' + size(total) : '') + ' · ' + chip + ' · ' + time} onClick={onNavigate}>
+        <span className="studio-footer-icon"><StudioIcon name="database" /></span>
+        <div className="spf-body">
+            <div className="spf-head"><StudioIcon name="database" /><strong>{t('sf_storage')}</strong><em className={'spf-plan is-' + (badge.type === 'trial' ? 'free' : state)} title={chip}>{badge.type !== 'trial' && badge.status !== 'none' && <StudioIcon name="crown" />}{chip}</em></div>
+            <div className="spf-usage"><b>{size(used)}</b>{total !== null && <><span>/ {size(total)}</span><small>{number(share, share < 10 ? 2 : 1)}%</small></>}</div>
+            {total !== null && <i className={'spf-bar ' + tone} role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(share)} aria-label={t('sf_storage')}><b style={{ width: Math.max(share, used > 0 ? 2 : 0) + '%' }} /></i>}
+            <div className="spf-meta">{total !== null && <span>{share >= 100 ? t('sf_full') : t('sf_left', { size: size(Math.max(0, total - used)) })}</span>}<span className={'spf-time is-' + state + (badge.status === 'active' && badge.days_left <= 3 ? ' is-soon' : '')}><StudioIcon name="clock" />{time}{date && <> · {date}</>}</span></div>
+        </div>
     </Link>;
 }
 
