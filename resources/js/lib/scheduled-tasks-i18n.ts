@@ -16,7 +16,7 @@ const words={
  noWorker:['No worker online','Online worker မရှိ','ไม่มีเวิร์กเกอร์ออนไลน์'],
  openWorkers:['Worker Health','Worker အခြေအနေ','สถานะเวิร์กเกอร์'],
  cronFix:['Cron is not running, so no task below runs. Add this line to the server crontab (crontab -e):','Cron မ run နေသောကြောင့် အောက်ပါ အလုပ်များ တစ်ခုမှ မ run ပါ။ Server ၏ crontab (crontab -e) တွင် ဤ line ကို ထည့်ပါ:','Cron ไม่ทำงาน งานด้านล่างจึงไม่รัน เพิ่มบรรทัดนี้ใน crontab ของเซิร์ฟเวอร์ (crontab -e):'],
- workerFix:['No media worker is online, so videos wait in the queue. Restart it on the server:','Media worker online မရှိသောကြောင့် ဗီဒီယိုများ queue တွင် စောင့်နေပါမည်။ Server တွင် ပြန်စပါ:','ไม่มี media worker ออนไลน์ วิดีโอจะรอในคิว รีสตาร์ตบนเซิร์ฟเวอร์:'],
+ w_standby:['Standby','အသင့်စောင့်နေ','สแตนด์บาย'],w_starting:['Starting','စတင်နေ','กำลังเริ่ม'],w_waiting:['Videos waiting','ဗီဒီယို စောင့်နေ','วิดีโอรออยู่'],w_failed:['Could not start','စတင်မရ','เริ่มไม่ได้'],w_manual:['No worker online','Online worker မရှိ','ไม่มีเวิร์กเกอร์ออนไลน์'],standbyHint:['Starts by itself when a video is queued','ဗီဒီယို တင်လျှင် အလိုအလျောက် စမည်','เริ่มเองเมื่อมีวิดีโอเข้าคิว'],workerFix:['No media worker is running, so videos cannot be processed. Start it on the server:','Media worker မ run နေသောကြောင့် ဗီဒီယိုများ process မလုပ်နိုင်ပါ။ Server တွင် စပါ:','ไม่มี media worker ทำงาน วิดีโอจึงประมวลผลไม่ได้ เริ่มบนเซิร์ฟเวอร์:'],
  copy:['Copy','Copy','คัดลอก'],
  copied:['Copied','Copy ပြီး','คัดลอกแล้ว'],
  task:['Task','အလုပ်','งาน'],

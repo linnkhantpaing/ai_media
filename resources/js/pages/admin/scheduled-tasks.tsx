@@ -34,7 +34,7 @@ export default function ScheduledTasks({overview:initial,endpoints}:{overview:Sc
  async function copy(value:string,key:string){try{await navigator.clipboard.writeText(value);setCopied(key);setTimeout(()=>mounted.current&&setCopied(''),1800);}catch{toast.error(t('error'));}}
  async function run(){if(!confirm)return;setSending(true);try{const next=await mediaApi<ScheduledOverview>(endpoints.run.replace('TASK',confirm.key),'POST',{confirm:true});setData(next);setConfirm(null);toast.success(t('requested'));}catch(error){toast.error(error instanceof MediaApiError&&error.status===422?t('busy'):t('error'));}finally{setSending(false);}}
  async function openHistory(task:ScheduledTask,status='',page=1){setHistory({task,data:history?.task.key===task.key?history.data:null,status,page});try{const result=await mediaApi<TaskHistory>(endpoints.history.replace('TASK',task.key)+'?'+new URLSearchParams({status,page:String(page)}),'GET');if(mounted.current)setHistory({task,data:result,status,page});}catch{toast.error(t('error'));}}
- const cron=data.scheduler,cronOk=cron.state==='running',workersOk=data.workers.online>0;
+ const cron=data.scheduler,cronOk=cron.state==='running',workerState=data.workers.state,workersOk=['online','standby','starting'].includes(workerState);
  const pending=(task:ScheduledTask)=>task.state==='queued'||task.state==='running';
  return <AppLayout area="admin" frame="preferences" adminPage="scheduledTasks" breadcrumbLabel={t('title')}><Head title={t('title')}/><section className="rv-page st-page">
   <header className="rv-page-heading"><div className="rv-title"><span className="rv-title-icon"><StudioIcon name="clock"/></span><div><h1>{t('title')}</h1><p>{t('subtitle')}</p></div></div>
@@ -42,10 +42,10 @@ export default function ScheduledTasks({overview:initial,endpoints}:{overview:Sc
 
   <div className="st-health">
    <article className={'st-health-card is-'+(cronOk?'ok':'bad')}><span className="st-health-icon"><StudioIcon name="clock"/></span><div><small>{t('scheduler')}</small><strong><i className="st-dot"/>{t(cron.state)}</strong><span>{t('lastTick')}: {cron.last_tick?ago(cron.last_tick):'—'}</span></div></article>
-   <article className={'st-health-card is-'+(workersOk?'ok':'warn')}><span className="st-health-icon"><StudioIcon name="server"/></span><div><small>{t('workers')}</small><strong><i className="st-dot"/>{workersOk?data.workers.online+' '+t('online'):t('noWorker')}</strong>{adminLinks?.workerHealth&&<Link href={adminLinks.workerHealth}>{t('openWorkers')}<StudioIcon name="arrow"/></Link>}</div></article>
+   <article className={'st-health-card is-'+(workersOk?'ok':'warn')}><span className="st-health-icon"><StudioIcon name="server"/></span><div><small>{t('workers')}</small><strong><i className="st-dot"/>{workerState==='online'?data.workers.online+' '+t('online'):t('w_'+workerState)}</strong>{workerState==='standby'&&<span>{t('standbyHint')}</span>}{adminLinks?.workerHealth&&<Link href={adminLinks.workerHealth}>{t('openWorkers')}<StudioIcon name="arrow"/></Link>}</div></article>
   </div>
   {!cronOk&&<Fix text={t('cronFix')} code={cron.cron_line} copied={copied==='cron'} copyLabel={t(copied==='cron'?'copied':'copy')} onCopy={()=>void copy(cron.cron_line,'cron')} tone="bad"/>}
-  {!workersOk&&<Fix text={t('workerFix')} code={data.workers.restart} copied={copied==='worker'} copyLabel={t(copied==='worker'?'copied':'copy')} onCopy={()=>void copy(data.workers.restart,'worker')} tone="warn"/>}
+  {!workersOk&&!data.workers.automatic&&<Fix text={t('workerFix')} code={data.workers.restart} copied={copied==='worker'} copyLabel={t(copied==='worker'?'copied':'copy')} onCopy={()=>void copy(data.workers.restart,'worker')} tone="warn"/>}
 
   <section className="st-table" aria-busy={busy}>
    <div className="st-row st-head" role="row"><span>{t('task')}</span><span>{t('status')}</span><span>{t('lastRun')}</span><span>{t('nextRun')}</span><span>{t('last24')}</span><span>{t('actions')}</span></div>

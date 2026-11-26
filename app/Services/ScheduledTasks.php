@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\MediaWorker;
 use App\Models\ScheduledTaskRun;
 use App\Models\User;
+use App\Services\Media\AutomaticMediaWorker;
 use Carbon\CarbonImmutable;
 use Cron\CronExpression;
 use Illuminate\Support\Facades\Artisan;
@@ -185,8 +186,7 @@ class ScheduledTasks
 
         return [
             'scheduler' => $scheduler,
-            'workers' => ['online' => MediaWorker::whereNull('stopped_at')->where('heartbeat_at', '>=', now()->subSeconds($ttl))->count(),
-                'restart' => 'supervisorctl restart zatlan-worker'],
+            'workers' => $this->workers(),
             'tasks' => $tasks,
             'timezone' => $zone,
             'keep_days' => self::KEEP_DAYS,
@@ -198,6 +198,28 @@ class ScheduledTasks
     public function failing(): int
     {
         return collect(array_keys(self::TASKS))->filter(fn (string $key) => ScheduledTaskRun::where('task', $key)->whereIn('status', ['success', 'failed'])->latest('id')->value('status') === 'failed')->count();
+    }
+
+    /**
+     * Media worker summary. In automatic mode a worker starts by itself when a video is queued, so
+     * no online worker while nothing waits is normal (standby). It needs attention only when work
+     * is waiting with no worker, automatic start failed, or manual mode has no worker running.
+     */
+    public function workers(): array
+    {
+        $online = MediaWorker::whereNull('stopped_at')->where('heartbeat_at', '>=', now()->subSeconds((int) config('operations.heartbeat_ttl', 45)))->count();
+        $automatic = app(AutomaticMediaWorker::class)->status();
+        $waiting = DB::table(config('queue.connections.database.table', 'jobs'))->whereIn('queue', config('operations.queues'))
+            ->where('available_at', '<=', now()->subSeconds(90)->timestamp)->exists();
+        $state = match (true) {
+            $online > 0 => 'online',
+            $automatic['enabled'] && in_array($automatic['state'], ['failed', 'unsupported'], true) => 'failed',
+            $waiting => 'waiting',
+            $automatic['enabled'] => in_array($automatic['state'], ['starting'], true) ? 'starting' : 'standby',
+            default => 'manual',
+        };
+
+        return ['online' => $online, 'state' => $state, 'automatic' => (bool) $automatic['enabled'], 'restart' => 'supervisorctl restart zatlan-worker'];
     }
 
     public function history(string $key, int $page = 1, string $status = ''): array
