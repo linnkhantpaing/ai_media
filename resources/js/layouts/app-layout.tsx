@@ -150,7 +150,7 @@ export default function AppLayout({ children, frame, breadcrumbLabel, area = 'us
     }, [frame, adminPage]);
     useEffect(() => {
         const onKey = (event: KeyboardEvent) => {
-            if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+            if (adminArea && (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
                 event.preventDefault();
                 setDrawer(false);
                 setSearch((value) => !value);
@@ -175,7 +175,7 @@ export default function AppLayout({ children, frame, breadcrumbLabel, area = 'us
             window.removeEventListener('pointerdown', closeDetails);
             window.removeEventListener('resize', resize);
         };
-    }, []);
+    }, [adminArea]);
 
     function toggleNavigation() {
         if (window.matchMedia(desktopQuery).matches) setCollapsed((value) => !value);
@@ -198,7 +198,7 @@ export default function AppLayout({ children, frame, breadcrumbLabel, area = 'us
             <header className="studio-topbar" ref={headerRef}>
                 <button type="button" className="icon-button studio-menu-toggle" aria-label={t(collapsed ? 'expandNavigation' : 'collapseNavigation')} title={t(collapsed ? 'expandNavigation' : 'collapseNavigation')} onClick={toggleNavigation}><StudioIcon name="menu" /></button>
                 <button type="button" className="icon-button studio-mobile-menu" aria-label={t('openNavigation')} aria-haspopup="dialog" aria-expanded={drawer} onClick={toggleNavigation}><StudioIcon name="menu" /></button>
-                <button type="button" className="studio-search-trigger" aria-label={t('searchPages')} aria-haspopup="dialog" onClick={() => setSearch(true)}><StudioIcon name="search" /><span>{t('searchPages')}</span><kbd>Ctrl K</kbd></button>
+                {adminArea && <button type="button" className="studio-search-trigger" aria-label={t('searchPages')} aria-haspopup="dialog" onClick={() => setSearch(true)}><StudioIcon name="search" /><span>{t('searchPages')}</span><kbd>Ctrl K</kbd></button>}
                 <div className="studio-header-controls">
                     {adminArea?<><LocaleSwitcher/><ThemeToggle compact/></>:<div className="user-header-communications"><LocaleSwitcher iconOnly/><CustomerQueue/><CustomerSupport/></div>}
                     {adminArea ? <AdminNotificationBell/> : <CustomerNotificationBell/>}

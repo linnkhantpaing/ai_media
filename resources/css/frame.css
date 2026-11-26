@@ -296,3 +296,12 @@ html[lang="my"] .studio-nav-link { line-height: 2; }
     .studio-topbar .studio-header-controls > .user-header-communications { grid-column: 1 / 4; grid-row: 2; justify-self: end; }
     .studio-header-controls > .cn-bell-wrap { grid-column: 4; grid-row: 2; justify-self: end; }
 }
+
+/* Customer header without page search: one row on phones (menu · icons · bell · profile) */
+.studio-topbar:not(:has(.studio-search-trigger)) .studio-header-controls { margin-left: auto; }
+@media (max-width: 639px) {
+    .studio-topbar:not(:has(.studio-search-trigger)) { display: flex; height: 56px; padding: 8px 12px; gap: 6px; }
+    .studio-topbar:not(:has(.studio-search-trigger)) .studio-header-controls { display: flex; align-items: center; gap: 6px; margin-left: auto; }
+    .studio-shell:has(.studio-topbar:not(:has(.studio-search-trigger))) .studio-content { min-height: calc(100svh - 56px); }
+    .studio-shell:has(.studio-topbar:not(:has(.studio-search-trigger))) .studio-panel { min-height: calc(100svh - 88px); }
+}
