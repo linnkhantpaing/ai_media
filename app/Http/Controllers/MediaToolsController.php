@@ -9,6 +9,7 @@ use App\Models\MediaPreset;
 use App\Models\MediaPreview;
 use App\Models\MediaProject;
 use App\Models\User;
+use App\Services\GeneralSettings;
 use App\Services\Media\MediaNarrationFit;
 use App\Services\Media\MediaRenderer;
 use App\Services\Media\MediaRuntime;
@@ -26,6 +27,8 @@ use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class MediaToolsController extends Controller
 {
+    private const LIMITED_PREVIEWS = ['voice', 'video', 'timing'];
+
     public function presets(Request $request): JsonResponse
     {
         return response()->json(['presets' => MediaPreset::where('user_id', $request->user()->id)->orderBy('name')->get(['id', 'name', 'settings'])]);
@@ -112,6 +115,7 @@ class MediaToolsController extends Controller
                 return $cached;
             }
             abort_if($locked->busy(), 409);
+            $this->enforcePreviewLimit($locked, $options['kind']);
             $preview = $locked->previews()->create(['provider_revision_id' => $providerRevision, 'kind' => $options['kind'], 'settings' => $settings, 'lines' => $lines, 'options' => $options, 'cache_key' => $key, 'status' => 'queued']);
             PrepareMediaPreview::dispatch($preview->id)->afterCommit();
 
@@ -119,6 +123,30 @@ class MediaToolsController extends Controller
         });
 
         return response()->json(['preview' => $this->data($preview)], $preview->status === 'completed' ? 200 : 202);
+    }
+
+    /**
+     * Daily preview allowance from the customer's plan (`preview_daily_limit`, empty = unlimited).
+     * Only new voice, video and timing previews count; a cached preview is returned before this
+     * check, and failed or cancelled previews do not use the allowance. Days follow the platform timezone.
+     */
+    private function enforcePreviewLimit(MediaProject $project, string $kind): void
+    {
+        if (StudioTesting::enabled() || ! in_array($kind, self::LIMITED_PREVIEWS, true)) {
+            return;
+        }
+        $limit = $project->user->currentPackageAssignment?->effectiveSnapshot()['definition']['preview_daily_limit'] ?? null;
+        if (! is_int($limit) || $limit < 1) {
+            return;
+        }
+        $zone = app(GeneralSettings::class)->publicData()['timezone'] ?? 'UTC';
+        $start = CarbonImmutable::now($zone)->startOfDay()->utc();
+        $used = MediaPreview::query()->whereIn('kind', self::LIMITED_PREVIEWS)->whereNotIn('status', ['failed', 'cancelled'])
+            ->where('created_at', '>=', $start)
+            ->whereHas('project', fn ($query) => $query->where('user_id', $project->user_id))->count();
+        if ($used >= $limit) {
+            abort(response()->json(['code' => 'preview_limit', 'limit' => $limit, 'message' => 'You have used today\'s previews on your plan. Try again tomorrow or upgrade.'], 429));
+        }
     }
 
     public function preview(Request $request, string $mediaProject, string $preview): JsonResponse

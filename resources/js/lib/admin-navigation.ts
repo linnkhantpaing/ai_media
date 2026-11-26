@@ -31,6 +31,7 @@ export const adminNavigation: AdminMenuGroup[] = [
         items: [
             { key: 'jobMonitor', icon: 'jobs', label: { en: 'Job Monitor', my: 'လုပ်ဆောင်မှု စောင့်ကြည့်ရန်', th: 'ติดตามงาน' } },
             { key: 'workerHealth', icon: 'activity', label: { en: 'Worker Health', my: 'Worker အခြေအနေ', th: 'สถานะเวิร์กเกอร์' } },
+            { key: 'scheduledTasks', icon: 'clock', label: { en: 'Scheduled Tasks', my: 'အချိန်ဇယားအလုပ်များ', th: 'งานตามกำหนดเวลา' } },
         ],
     },
     {

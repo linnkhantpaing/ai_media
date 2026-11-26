@@ -133,12 +133,15 @@ class AdminDashboard
         $providerState = ! $provider->ready($configuration) ? 'unconfigured' : (! $check ? 'untested' : ($check->status === 'success' ? 'tested' : 'failed'));
         $storage = (int) DB::table('media_files')->whereNotNull('verified_at')->where('state', '!=', 'deleted')->sum('bytes');
         $budget = (int) app(StorageSettings::class)->policy()['budget'];
+        $scheduler = app(ScheduledTasks::class)->scheduler();
+        $failing = app(ScheduledTasks::class)->failing();
         $attention = [
             ['key' => 'failedJobs', 'count' => AdminNotice::where('category', 'jobs')->where('target_type', 'job')->where('issue', 'attention')->count(), 'url' => route('admin.notifications.index', ['category' => 'jobs', 'issue' => 'attention', 'dates' => 'all'], false)],
             ['key' => 'paymentReview', 'count' => DB::table('payment_transactions')->whereIn('status', ['pending_review', 'under_review'])->count(), 'url' => route('admin.payments.index', ['tab' => 'review'], false)],
             ['key' => 'refundReview', 'count' => DB::table('payment_refunds')->whereIn('status', ['requested', 'under_review'])->count(), 'url' => route('admin.payments.index', ['tab' => 'refunds', 'refund_status' => 'pending'], false)],
             ['key' => 'supportReply', 'count' => DB::table('support_conversations')->where('status', '!=', 'resolved')->whereRaw('COALESCE(last_customer_message_id,0) > COALESCE(last_admin_reply_id,0)')->count(), 'url' => route('admin.support.index', ['tab' => 'needs_reply'], false)],
             ['key' => 'workerAttention', 'count' => $workers['counts']['attention'], 'url' => route('admin.jobs.workers', ['scope' => 'current'], false)],
+            ['key' => 'scheduleAttention', 'count' => $failing + ($scheduler['state'] === 'stopped' ? 1 : 0), 'url' => route('admin.schedules.index', absolute: false)],
         ];
 
         return ['filters' => $filters, 'summary' => [...$summary, 'active' => $active], 'previous' => $previous,
@@ -147,11 +150,11 @@ class AdminDashboard
             'trend' => $this->trend(clone $finance, $bounds), 'modes' => $modes, 'packages' => $packages, 'package_total' => $packageTotal,
             'recent' => $recent, 'attention' => $attention,
             'system' => ['workers' => $workers['counts'], 'processing' => $workers['processingState'], 'storage' => $storage, 'budget' => $budget,
-                'provider' => $providerState, 'provider_checked_at' => $check?->checked_at ? CarbonImmutable::parse($check->checked_at, 'UTC')->toIso8601String() : null],
+                'scheduler' => ['state' => $scheduler['state'], 'failed' => $failing], 'provider' => $providerState, 'provider_checked_at' => $check?->checked_at ? CarbonImmutable::parse($check->checked_at, 'UTC')->toIso8601String() : null],
             'links' => ['index' => route('admin.dashboard', absolute: false), 'users' => route('admin.users.index', absolute: false),
                 'payments' => route('admin.payments.index', absolute: false), 'revenue' => route('admin.revenue.index', absolute: false),
                 'processing' => route('admin.processing.index', absolute: false), 'jobs' => route('admin.jobs.index', absolute: false),
-                'workers' => route('admin.jobs.workers', absolute: false), 'usage' => route('admin.usage.index', absolute: false),
+                'workers' => route('admin.jobs.workers', absolute: false), 'schedules' => route('admin.schedules.index', absolute: false), 'usage' => route('admin.usage.index', absolute: false),
                 'support' => route('admin.support.index', absolute: false), 'storage' => route('admin.settings.storage', absolute: false),
                 'providers' => route('admin.settings.providers', absolute: false), 'notifications' => route('admin.notifications.index', absolute: false)]];
     }

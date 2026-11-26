@@ -180,7 +180,10 @@ class UsageLedger
             $available = min($available, $own['available']);
         }
 
-        return ['estimated_seconds' => (int) ceil($project->metadata['duration']), 'videos' => $counted ? 0 : 1, 'available_seconds' => $available, 'workflow' => $workflow];
+        // The current run was already charged when its script was made: exporting it costs nothing more.
+        $paid = $project->active_run_id && UsageRecord::where('media_run_id', $project->active_run_id)->whereIn('status', ['charged', 'adjusted'])->exists();
+
+        return ['estimated_seconds' => $paid ? 0 : (int) ceil($project->metadata['duration']), 'videos' => $counted || $paid ? 0 : 1, 'available_seconds' => $available, 'workflow' => $workflow, 'charged' => $paid];
     }
 
     public function balances(int $userId, mixed $anchor, ?string $workflow = null): array

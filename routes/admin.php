@@ -12,6 +12,7 @@ use App\Http\Controllers\Admin\PaymentController;
 use App\Http\Controllers\Admin\PaymentSettingsController;
 use App\Http\Controllers\Admin\ProcessingReportController;
 use App\Http\Controllers\Admin\RevenueController;
+use App\Http\Controllers\Admin\ScheduledTaskController;
 use App\Http\Controllers\Admin\SubscriptionController;
 use App\Http\Controllers\Admin\SupportController;
 use App\Http\Controllers\Admin\UsageLedgerController;
@@ -112,6 +113,9 @@ Route::prefix('admin')->name('admin.')->group(function (): void {
         Route::put('/settings/defaults', [ProjectDefaultsController::class, 'save'])->middleware('throttle:provider-settings')->name('settings.defaults.save');
         Route::get('/operations/workers', [JobMonitorController::class, 'workers'])->name('jobs.workers');
         Route::get('/operations/workers/{mediaWorker}', [JobMonitorController::class, 'worker'])->whereUuid('mediaWorker')->name('jobs.worker');
+        Route::get('/operations/schedules', [ScheduledTaskController::class, 'index'])->name('schedules.index');
+        Route::get('/operations/schedules/{task}/history', [ScheduledTaskController::class, 'history'])->where('task', '[a-z_]+')->middleware('throttle:60,1')->name('schedules.history');
+        Route::post('/operations/schedules/{task}/run', [ScheduledTaskController::class, 'run'])->where('task', '[a-z_]+')->middleware('throttle:20,1')->name('schedules.run');
         Route::get('/operations/jobs', [JobMonitorController::class, 'index'])->name('jobs.index');
         Route::get('/operations/jobs/{mediaTask}', [JobMonitorController::class, 'show'])->whereNumber('mediaTask')->name('jobs.show');
         Route::post('/operations/jobs/{mediaTask}/action', [JobMonitorController::class, 'action'])->whereNumber('mediaTask')->middleware('throttle:30,1')->name('jobs.action');

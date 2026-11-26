@@ -4,14 +4,14 @@ const words:Record<string,readonly [string,string,string]>={
  "notEnough": ["Not enough minutes left for this video.","ဤဗီဒီယိုအတွက် မိနစ် မလောက်ပါ။","นาทีคงเหลือไม่พอสำหรับวิดีโอนี้"],
  "buyMinutes": ["Buy minutes","မိနစ် ထပ်ဝယ်ရန်","ซื้อนาทีเพิ่ม"],
  "estimate": [
-  "Estimated charge per successful export",
-  "အောင်မြင်စွာ ထုတ်ယူမှုတစ်ကြိမ်အတွက် ခန့်မှန်းနုတ်ယူမှု",
-  "ยอดหักโดยประมาณต่อการส่งออกสำเร็จ"
+  "Minutes this video will use",
+  "ဤဗီဒီယိုအတွက် သုံးမည့် မိနစ်",
+  "นาทีที่วิดีโอนี้จะใช้"
  ],
  "eachExport": [
-  "A new export uses source-video time; the same project counts as one video per period. Failed work releases its reservation.",
-  "အသစ်ထုတ်ယူတိုင်း မူရင်းဗီဒီယိုကြာချိန်ကို နုတ်ပါမည်။ ကာလတစ်ခုအတွင်း ပရောဂျက်တူကို ဗီဒီယိုတစ်ခုသာ ရေတွက်သည်။ မအောင်မြင်လျှင် reserve ကို ပြန်လွှတ်သည်။",
-  "การส่งออกใหม่ใช้เวลาต้นฉบับ โปรเจกต์เดิมนับหนึ่งวิดีโอต่อช่วงเวลา งานล้มเหลวคืนการสำรอง"
+  "Minutes are used once the script is ready. Exporting it after review uses no more; editing and exporting again later counts as a new export. Failed or cancelled work is not charged.",
+  "Script ရရှိသည်နှင့် မိနစ် နုတ်ပါမည်။ စစ်ပြီး Export လုပ်လျှင် ထပ်မနုတ်ပါ။ နောက်မှ ပြန်ပြင်ပြီး Export ထပ်လုပ်လျှင် Export အသစ်အဖြစ် နုတ်ပါမည်။ မအောင်မြင် / ရပ်ထားသော အလုပ်ကို မနုတ်ပါ။",
+  "นาทีจะถูกใช้เมื่อสคริปต์พร้อม การส่งออกหลังตรวจสอบไม่ใช้เพิ่ม หากแก้ไขและส่งออกใหม่ภายหลังจะนับเป็นการส่งออกใหม่ งานที่ล้มเหลวหรือยกเลิกจะไม่ถูกหัก"
  ],
  "title": [
   "Usage Ledger",

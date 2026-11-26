@@ -17,7 +17,7 @@ class MediaRenderer
     public function render(MediaRun $run, string $directory, callable $stage, callable $cancelled): array
     {
         $project = $run->project;
-        $settings = MediaSettings::normalize($run->settings);
+        $settings = self::capResolution(MediaSettings::normalize($run->settings), self::resolutionCap($run), $project->metadata);
         $lines = array_values(array_filter($run->lines ?? [], fn (array $line): bool => $line['included'] ?? true));
         if (! is_array($lines) || $lines === []) {
             throw new MediaFailure('invalid_script');
@@ -368,10 +368,39 @@ class MediaRenderer
      */
     public static function watermarked(MediaRun $run): bool
     {
+        return (bool) (self::reservedDefinition($run)['watermark'] ?? false);
+    }
+
+    /** Highest export resolution (short side, 720 or 1080) allowed by the plan the run was reserved under; null = no cap. */
+    public static function resolutionCap(MediaRun $run): ?int
+    {
+        $cap = (int) (self::reservedDefinition($run)['max_resolution'] ?? 0);
+
+        return in_array($cap, [720, 1080], true) ? $cap : null;
+    }
+
+    /** Lowers the chosen output quality to the plan cap; a lower choice than the cap is kept. */
+    public static function capResolution(array $settings, ?int $cap, array $metadata): array
+    {
+        if ($cap === null) {
+            return $settings;
+        }
+        $chosen = match ($settings['quality'] ?? 'source') {
+            '720p' => 720, '1080p' => 1080, default => min((int) ($metadata['width'] ?? 0), (int) ($metadata['height'] ?? 0)) ?: PHP_INT_MAX,
+        };
+        if ($chosen > $cap) {
+            $settings['quality'] = $cap === 720 ? '720p' : '1080p';
+        }
+
+        return $settings;
+    }
+
+    private static function reservedDefinition(MediaRun $run): array
+    {
         $snapshot = UsageRecord::where('media_run_id', $run->id)->value('package_snapshot');
         $snapshot = is_string($snapshot) ? json_decode($snapshot, true) : $snapshot;
 
-        return (bool) ($snapshot['definition']['watermark'] ?? false);
+        return is_array($snapshot['definition'] ?? null) ? $snapshot['definition'] : [];
     }
 
     private function filters(array $settings, array $metadata, bool $watermark = false): string

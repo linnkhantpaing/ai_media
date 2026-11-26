@@ -139,6 +139,6 @@ Object.assign(words,{
  'min left this period':['မိနစ် ဤသက်တမ်းအတွက် ကျန်သည်','นาทีคงเหลือในรอบนี้'],
  'Buy minutes':['မိနစ် ထပ်ဝယ်ရန်','ซื้อนาทีเพิ่ม'],
  'Videos up to':['ဗီဒီယို အများဆုံး','วิดีโอสูงสุด'],
- 'Videos on your plan include the ZATLAN watermark.':['သင့် Plan ဖြင့် ထုတ်သော ဗီဒီယိုများတွင် ZATLAN watermark ပါပါမည်။','วิดีโอในแพ็กเกจของคุณมีลายน้ำ ZATLAN'],
+ 'Up to 720p on your plan':['သင့် Plan တွင် 720p အထိ','สูงสุด 720p ในแพ็กเกจของคุณ'],'Up to 1080p on your plan':['သင့် Plan တွင် 1080p အထိ','สูงสุด 1080p ในแพ็กเกจของคุณ'],'Videos on your plan include the ZATLAN watermark.':['သင့် Plan ဖြင့် ထုတ်သော ဗီဒီယိုများတွင် ZATLAN watermark ပါပါမည်။','วิดีโอในแพ็กเกจของคุณมีลายน้ำ ZATLAN'],
  'Upgrade to remove it':['ဖယ်ရှားရန် Upgrade လုပ်ပါ','อัปเกรดเพื่อเอาออก'],
 });

@@ -61,6 +61,9 @@ maintenance_enabled:[['Maintenance mode enabled','ပြုပြင်ထိန
 words.support=['Support','အကူအညီတောင်းဆိုမှုများ','การช่วยเหลือ'];
 words.support_reply=['Customer replied to Support','အကူအညီတောင်းဆိုမှု စာအသစ်ရောက်ရှိ','ลูกค้าตอบกลับฝ่ายช่วยเหลือ'];
 words.support_reply_body=['{customer} sent a support message. Open the conversation to reply.','{customer} ထံမှ စာရောက်ရှိပါသည်။ Conversation မှာ ပြန်ဖြေနိုင်သည်။','{customer} ส่งข้อความช่วยเหลือ เปิดการสนทนาเพื่อตอบกลับ'];
+words.openSchedules=['Open Scheduled Tasks','အချိန်ဇယားအလုပ်များ ဖွင့်ရန်','เปิดงานตามกำหนดเวลา'];
+events.scheduler_stopped=[['Scheduler (cron) stopped','Scheduler (cron) ရပ်နေသည်','Scheduler (cron) หยุดทำงาน'],['Background tasks are not running. Check the cron line on the server.','နောက်ခံအလုပ်များ မလုပ်ဆောင်တော့ပါ။ Server ရှိ cron line ကို စစ်ပါ။','งานเบื้องหลังไม่ทำงาน ตรวจสอบบรรทัด cron บนเซิร์ฟเวอร์']];
+events.schedule_failed=[['Scheduled task failed','အချိန်ဇယားအလုပ် မအောင်မြင်','งานตามกำหนดเวลาล้มเหลว'],['A background task failed. Open Scheduled Tasks to see the error or run it again.','နောက်ခံအလုပ်တစ်ခု မအောင်မြင်ပါ။ Error ကြည့်ရန် သို့မဟုတ် ပြန် run ရန် Scheduled Tasks ကို ဖွင့်ပါ။','งานเบื้องหลังล้มเหลว เปิดงานตามกำหนดเวลาเพื่อดูข้อผิดพลาดหรือรันอีกครั้ง']];
 for(const [key,[title,body]] of Object.entries(events)){words[key]=title;words[key+'_body']=body;}
 export function useNotificationText(){
  const {locale}=usePage<SharedData>().props,index=locale==='my'?1:locale==='th'?2:0;

@@ -2,6 +2,7 @@ import {usePage} from '@inertiajs/react';
 import type {SharedData} from '@/types';
 const words:Record<string,[string,string,string]>={
  sec:['sec','စက္ကန့်','วินาที'],
+ scheduler:['Scheduled Tasks','အချိန်ဇယားအလုပ်များ','งานตามกำหนดเวลา'],schedulerRunning:['Running','အလုပ်လုပ်နေ','ทำงานอยู่'],schedulerStopped:['Cron stopped','Cron ရပ်နေ','Cron หยุด'],schedulerNever:['Not set up','မချိတ်ရသေး','ยังไม่ตั้งค่า'],tasksFailed:['failed','fail','ล้มเหลว'],scheduleAttention:['Scheduled tasks needing attention','စစ်ဆေးရန်လိုသော အချိန်ဇယားအလုပ်','งานตามกำหนดเวลาที่ต้องตรวจสอบ'],
  title:['Dashboard','ခြုံငုံသုံးသပ်ချက်','แดชบอร์ด'],intro:['Overview of customers, payments and video processing.','အသုံးပြုသူ၊ ငွေပေးချေမှုနှင့် ဗီဒီယိုလုပ်ဆောင်မှု အခြေအနေ။','ภาพรวมลูกค้า การชำระเงิน และการประมวลผลวิดีโอ'],
  quick:['Quick Actions','အမြန်လုပ်ဆောင်ရန်','การดำเนินการด่วน'],current:['Current','လက်ရှိ','ปัจจุบัน'],period:['Selected period','ရွေးထားသောကာလ','ช่วงที่เลือก'],updated:['Last updated','နောက်ဆုံးပြင်ဆင်ချိန်','อัปเดตล่าสุด'],
  active:['Active Customers','အသုံးပြုခွင့်ရှိသူ','ลูกค้าที่ใช้งานได้'],activeHint:['With active access · Current','လက်ရှိ အသုံးပြုခွင့်ရှိသူ','สิทธิ์ใช้งานปัจจุบัน'],

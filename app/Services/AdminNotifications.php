@@ -9,6 +9,7 @@ use App\Models\MediaTask;
 use App\Models\MediaWorker;
 use App\Models\PaymentRefund;
 use App\Models\PaymentTransaction;
+use App\Models\ScheduledTaskRun;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Query\Builder;
@@ -189,6 +190,28 @@ class AdminNotifications
         }
     }
 
+    /** Cron stopped, and the latest run of each scheduled task failed (resolved again by the next good run). */
+    public function scheduledTasks(): void
+    {
+        $tasks = app(ScheduledTasks::class);
+        $scheduler = $tasks->scheduler();
+        if ($scheduler['state'] === 'stopped') {
+            $this->publish('scheduler:availability', ['category' => 'jobs', 'kind' => 'scheduler_stopped', 'priority' => 'critical',
+                'target_type' => 'schedules', 'target_id' => null, 'reference' => 'Scheduled Tasks', 'context' => ['last_tick' => $scheduler['last_tick']]]);
+        } elseif ($scheduler['state'] === 'running') {
+            $this->resolve('scheduler:availability');
+        }
+        foreach (array_keys(ScheduledTasks::TASKS) as $key) {
+            $run = ScheduledTaskRun::where('task', $key)->whereIn('status', ['success', 'failed'])->latest('id')->first();
+            if ($run?->status === 'failed') {
+                $this->publish('schedule:'.$key, ['category' => 'jobs', 'kind' => 'schedule_failed', 'priority' => 'warning', 'target_type' => 'schedules',
+                    'target_id' => $key, 'reference' => 'Scheduled Tasks', 'context' => ['task' => $key, 'error' => mb_substr((string) $run->error, 0, 300)]], $run->finished_at);
+            } elseif ($run) {
+                $this->resolve('schedule:'.$key);
+            }
+        }
+    }
+
     public function synchronize(bool $force = false): void
     {
         Cache::lock('admin-notifications-sync', 60)->get(function () use ($force): void {
@@ -229,6 +252,7 @@ class AdminNotifications
                         $this->audit($event);
                     }
                 }
+                $this->scheduledTasks();
                 $checkId = DB::table('media_storage_checks')->max('id');
                 if ($checkId && ($event = AuditEvent::where('source', 'storage_check')->where('source_id', $checkId)->first())) {
                     $this->audit($event);
@@ -355,7 +379,7 @@ class AdminNotifications
             'subscription' => $record ? route('admin.subscriptions.index', ['q' => $row->reference], absolute: false) : null,
             'audit' => $record ? route('admin.audit.index', ['q' => $row->reference], absolute: false) : null,
             'support' => DB::table('support_conversations')->where('id', $row->target_id)->exists() ? route('admin.support.index', ['conversation' => $row->target_id], absolute: false) : null,
-            'workers' => route('admin.jobs.workers', absolute: false), 'providers' => route('admin.settings.providers', absolute: false),
+            'workers' => route('admin.jobs.workers', absolute: false), 'schedules' => route('admin.schedules.index', absolute: false), 'providers' => route('admin.settings.providers', absolute: false),
             'storage' => route('admin.settings.storage', absolute: false), 'general' => route('admin.settings.general', absolute: false), default => null,
         };
         $result['related_url'] = $url;
