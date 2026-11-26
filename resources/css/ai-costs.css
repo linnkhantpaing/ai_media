@@ -117,3 +117,10 @@
 @media (max-width:1180px){.ac-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}.ac-kpi strong{font-size:20px}}
 @media (max-width:640px){.ac-kpis{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.ac-kpi strong{font-size:17px}}
 .ac-kpi header{min-height:30px}
+/* Filter row: range select, then the two custom dates side by side (no extra frame) */
+.pr-filters.ac-filters{display:flex;flex-wrap:wrap;align-items:center;gap:10px}
+.pr-filters.ac-filters>div:first-child{flex:0 0 200px;min-width:0}
+.ac-dates{display:flex;align-items:center;gap:10px;min-width:0}
+.ac-dates>.date-picker-trigger{width:180px;height:38px;min-height:38px}
+@media (max-width:640px){.pr-filters.ac-filters>div:first-child{flex:1 1 100%}.ac-dates{flex:1 1 100%}.ac-dates>.date-picker-trigger{flex:1;width:auto;min-width:0}}
+.ac-dates>.date-picker-trigger{margin:0}

@@ -80,7 +80,7 @@ export default function AiCosts({ report: initial, filters: initialFilters, pric
 
         <div className="pr-filters ac-filters">
             <SelectField label={t('range')} value={filters.range} options={([['1', 'today'], ['7', 'last7'], ['30', 'last30'], ['90', 'last90'], ['custom', 'custom']] as const).map(([value, key]) => ({ value, label: t(key) }))} onChange={(value) => void load({ ...filters, range: value as AiCostFilters['range'], customers_page: 1, videos_page: 1, from: value === 'custom' ? filters.from ?? report.range.start : null, to: value === 'custom' ? filters.to ?? report.range.end : null })} />
-            {filters.range === 'custom' && <div className="rv-custom-dates"><DatePicker id="ac-from" label={t('from')} value={filters.from ?? ''} today={today} max={filters.to || today} locale={locale} onChange={(value) => void load({ ...filters, from: value })} /><DatePicker id="ac-to" label={t('to')} value={filters.to ?? ''} today={today} min={filters.from ?? undefined} max={today} locale={locale} onChange={(value) => void load({ ...filters, to: value })} /></div>}
+            {filters.range === 'custom' && <div className="ac-dates"><DatePicker id="ac-from" label={t('from')} value={filters.from ?? ''} today={today} max={filters.to || today} locale={locale} onChange={(value) => void load({ ...filters, from: value })} /><DatePicker id="ac-to" label={t('to')} value={filters.to ?? ''} today={today} min={filters.from ?? undefined} max={today} locale={locale} onChange={(value) => void load({ ...filters, to: value })} /></div>}
             <span className="ac-range-label"><StudioIcon name="calendar" />{report.range.start} → {report.range.end} · {report.range.timezone}</span>
         </div>
 
