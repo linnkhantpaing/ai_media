@@ -125,6 +125,9 @@ class PlanWorkflowsTest extends TestCase
         $this->assertSame(450, $definition['price_minor']);
         $this->assertArrayNotHasKey('validity_days', $definition);
         $this->get('/admin/packages?type=topup')->assertOk()->assertInertia(fn (Assert $page) => $page->has('catalog.packages', 1));
+        // A top-up must never be offered as a customer's plan, and must not break the accounts page.
+        $this->get('/admin/users')->assertOk()->assertInertia(fn (Assert $page) => $page->where('accounts.packages', []));
+        $this->getJson('/admin/users/package-options')->assertOk()->assertJsonMissing(['code' => 'TOP-MOVIE']);
     }
 
     public function test_locked_workflows_long_sources_and_long_recaps_are_refused_by_the_server(): void

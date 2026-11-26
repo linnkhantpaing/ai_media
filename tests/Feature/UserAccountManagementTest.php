@@ -7,11 +7,14 @@ use App\Jobs\InspectMediaProject;
 use App\Jobs\PrepareMediaPreview;
 use App\Jobs\ProcessMediaRun;
 use App\Models\CustomerAccountEvent;
+use App\Models\MediaPreset;
 use App\Models\MediaPreview;
 use App\Models\MediaProject;
 use App\Models\MediaRun;
 use App\Models\Package;
 use App\Models\PackageVersion;
+use App\Models\PaymentTransaction;
+use App\Models\UsageRecord;
 use App\Models\User;
 use App\Services\Media\MediaInspector;
 use App\Services\Media\MediaPipeline;
@@ -24,6 +27,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -302,5 +306,33 @@ class UserAccountManagementTest extends TestCase
         $user = User::findOrFail($response->json('customer.id'));
         $this->assertTrue(Hash::check($literal, $user->password));
         $this->assertNotSame($literal, $user->password);
+    }
+
+    public function test_deleting_a_customer_removes_everything_and_frees_the_email(): void
+    {
+        Storage::fake('local');
+        $id = $this->actingAs($this->admin, 'admin')->postJson('/admin/users', $this->payload())->assertCreated()->json('customer.id');
+        $customer = User::findOrFail($id);
+        $project = MediaProject::factory()->create(['user_id' => $id, 'storage_disk' => 'local', 'status' => 'completed']);
+        MediaRun::factory()->create(['media_project_id' => $project->id, 'status' => 'completed']);
+        Storage::disk('local')->put('media/'.$project->id.'/output.mp4', 'video');
+        $preset = MediaPreset::create(['user_id' => $id, 'name' => 'Mine', 'settings' => []]);
+        $customer->forceFill(['default_preset_id' => $preset->id])->save();
+        UsageRecord::factory()->create(['user_id' => $id, 'media_project_id' => $project->id]);
+        PaymentTransaction::factory()->create(['user_id' => $id]);
+        $url = '/admin/users/'.$id;
+
+        $this->deleteJson($url, ['revision' => $customer->fresh()->account_revision, 'confirm_email' => 'wrong@example.com'])->assertUnprocessable()->assertJsonValidationErrors('confirm_email');
+        $this->assertDatabaseHas('users', ['id' => $id]);
+        $this->deleteJson($url, ['revision' => $customer->fresh()->account_revision, 'confirm_email' => 'AUNG@example.com'])->assertOk();
+
+        $this->assertDatabaseMissing('users', ['id' => $id]);
+        foreach (['media_projects', 'media_runs', 'media_presets', 'usage_records', 'payment_transactions', 'customer_package_assignments', 'customer_account_events'] as $table) {
+            $this->assertDatabaseCount($table, 0);
+        }
+        Storage::disk('local')->assertMissing('media/'.$project->id.'/output.mp4');
+        $this->postJson('/admin/users', $this->payload())->assertCreated();
+        $this->deleteJson('/admin/users/'.$this->admin->id, ['revision' => 1, 'confirm_email' => $this->admin->email])->assertNotFound();
+        $this->assertDatabaseHas('users', ['id' => $this->admin->id]);
     }
 }

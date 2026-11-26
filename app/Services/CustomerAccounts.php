@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Exceptions\MediaFailure;
 use App\Models\CustomerAccountEvent;
 use App\Models\CustomerPackageAssignment;
 use App\Models\MediaProject;
@@ -9,11 +10,14 @@ use App\Models\Package;
 use App\Models\PackageVersion;
 use App\Models\User;
 use App\Notifications\CustomerWelcome;
+use App\Services\Media\MediaStorage;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
@@ -36,7 +40,8 @@ class CustomerAccounts
 
     public function packageOptions(): array
     {
-        return Package::where('status', 'active')->where('published_version', '>', 0)->orderBy('name')->get()
+        // Top-ups add minutes to a plan; they are never assigned as a customer's plan.
+        return Package::where('status', 'active')->where('type', '!=', 'topup')->where('published_version', '>', 0)->orderBy('name')->get()
             ->map(function (Package $package): ?array {
                 $version = PackageVersion::where('package_id', $package->id)->where('number', $package->published_version)->first();
                 if (! $version) {
@@ -308,6 +313,87 @@ class CustomerAccounts
     private function assignmentAudit(CustomerPackageAssignment $assignment): array
     {
         return ['assignment_id' => $assignment->id, 'package_id' => $assignment->package_id, 'package_name' => $assignment->snapshot['name'], 'package_version' => $assignment->snapshot['version'], 'starts_at' => $assignment->starts_at->toIso8601String(), 'ends_at' => $assignment->ends_at->toIso8601String()];
+    }
+
+    /**
+     * Permanently deletes a customer: every project file (R2 and local), profile photo, payment
+     * receipts and support attachments, then all of their database rows and the account itself,
+     * so the email address can be used again. Admin accounts can never be deleted here.
+     */
+    public function destroy(User $actor, int $id, array $data): void
+    {
+        abort_unless($actor->is_admin, 403);
+        Cache::lock('customer-account:'.$id, 120)->block(10, function () use ($actor, $id, $data): void {
+            $user = $this->customer($id);
+            abort_unless($user->account_revision === (int) $data['revision'], 409, 'This account changed. Refresh and try again.');
+            if (mb_strtolower(trim((string) ($data['confirm_email'] ?? ''))) !== mb_strtolower($user->email)) {
+                throw ValidationException::withMessages(['confirm_email' => 'Type the customer email exactly to confirm.']);
+            }
+            $projects = MediaProject::where('user_id', $id)->get();
+            if ($projects->contains(fn (MediaProject $project): bool => $project->busy())) {
+                abort(409, 'A video is still processing for this customer. Cancel it or wait until it finishes, then delete again.');
+            }
+
+            // Files first: if storage cannot be cleaned, nothing in the database is removed.
+            foreach ($projects as $project) {
+                try {
+                    app(MediaStorage::class)->discard($project);
+                } catch (MediaFailure) {
+                    abort(503, 'Stored files could not be removed. Check the storage connection and try again.');
+                }
+            }
+            if ($user->avatar_path) {
+                app(CustomerProfile::class)->removeAvatar($user);
+            }
+            $payments = DB::table('payment_transactions')->where('user_id', $id)->pluck('id');
+            $conversations = DB::table('support_conversations')->where('customer_id', $id)->pluck('id');
+            $messages = DB::table('support_messages')->whereIn('conversation_id', $conversations)->pluck('id');
+            $local = Storage::disk('local');
+            foreach ([...DB::table('payment_receipts')->whereIn('payment_transaction_id', $payments)->pluck('path'), ...DB::table('support_attachments')->whereIn('message_id', $messages)->pluck('path')] as $path) {
+                if (is_string($path) && $path !== '') {
+                    $local->delete($path);
+                }
+            }
+
+            DB::transaction(function () use ($user, $id, $projects, $payments, $conversations, $messages): void {
+                $projectIds = $projects->pluck('id');
+                $tasks = DB::table('media_tasks')->whereIn('media_project_id', $projectIds)->pluck('id');
+                DB::table('media_task_events')->whereIn('media_task_id', $tasks)->delete();
+                DB::table('media_task_actions')->whereIn('media_task_id', $tasks)->delete();
+                DB::table('media_tasks')->whereIn('id', $tasks)->delete();
+                DB::table('media_previews')->whereIn('media_project_id', $projectIds)->delete();
+                DB::table('media_files')->whereIn('media_project_id', $projectIds)->delete();
+                DB::table('usage_events')->whereIn('usage_record_id', DB::table('usage_records')->where('user_id', $id)->pluck('id'))->delete();
+                DB::table('usage_records')->where('user_id', $id)->delete();
+                DB::table('usage_credits')->where('user_id', $id)->delete();
+                DB::table('media_projects')->where('user_id', $id)->update(['active_run_id' => null]);
+                DB::table('media_runs')->whereIn('media_project_id', $projectIds)->delete();
+                DB::table('media_projects')->whereIn('id', $projectIds)->delete();
+                DB::table('media_cleanup_previews')->where('user_id', $id)->delete();
+                DB::table('users')->where('id', $id)->update(['default_preset_id' => null]);
+                DB::table('media_presets')->where('user_id', $id)->delete();
+                DB::table('payment_receipts')->whereIn('payment_transaction_id', $payments)->delete();
+                DB::table('payment_refunds')->whereIn('payment_transaction_id', $payments)->delete();
+                DB::table('payment_events')->whereIn('payment_transaction_id', $payments)->delete();
+                DB::table('payment_transactions')->whereIn('id', $payments)->delete();
+                DB::table('support_attachments')->whereIn('message_id', $messages)->delete();
+                DB::table('support_reads')->whereIn('conversation_id', $conversations)->delete();
+                DB::table('support_messages')->whereIn('conversation_id', $conversations)->delete();
+                DB::table('support_conversations')->whereIn('id', $conversations)->delete();
+                $notices = DB::table('admin_notices')->where('customer_id', $id)->pluck('id');
+                DB::table('admin_notice_states')->whereIn('notice_id', $notices)->delete();
+                DB::table('admin_notices')->whereIn('id', $notices)->delete();
+                DB::table('customer_notifications')->where('user_id', $id)->delete();
+                DB::table('customer_account_events')->where('user_id', $id)->delete();
+                DB::table('customer_package_assignments')->where('user_id', $id)->update(['supersedes_id' => null]);
+                DB::table('customer_package_assignments')->where('user_id', $id)->delete();
+                DB::table('sessions')->where('user_id', $id)->delete();
+                DB::table(config('auth.passwords.users.table', 'password_reset_tokens'))->where('email', $user->email)->delete();
+                DB::table('users')->where('id', $id)->where('is_admin', false)->delete();
+            });
+            Cache::forget('admin-notifications-synced');
+            Log::notice('Customer account permanently deleted.', ['customer_id' => $id, 'actor_id' => $actor->id, 'reason' => $data['reason'] ?? null]);
+        });
     }
 
     private function revoke(User $user): void

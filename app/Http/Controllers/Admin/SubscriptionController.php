@@ -70,7 +70,7 @@ class SubscriptionController extends Controller
             })->all(),
             'pagination' => ['page' => $page->currentPage(), 'pages' => $page->lastPage(), 'total' => $page->total(), 'from' => $page->firstItem(), 'to' => $page->lastItem()],
             'summary' => $summary, 'packages' => $accounts->packageOptions(),
-            'packageFilters' => Package::where('published_version', '>', 0)->orderBy('name')->get(['id', 'name'])->toArray(),
+            'packageFilters' => Package::where('published_version', '>', 0)->where('type', '!=', 'topup')->orderBy('name')->get(['id', 'name'])->toArray(),
             'timezone' => config('app.timezone'), 'today' => now(config('app.timezone'))->toDateString(),
             'filters' => ['q' => $search, 'package_id' => (string) ($filters['package_id'] ?? ''), 'status' => $filters['status'] ?? '', 'dates' => $dates, 'from' => $filters['from'] ?? '', 'to' => $filters['to'] ?? '', 'sort' => $filters['sort'] ?? 'expiring', 'per_page' => (int) ($filters['per_page'] ?? 10)],
             'endpoints' => ['index' => route('admin.subscriptions.index', absolute: false), 'packages' => route('admin.users.package-options', absolute: false), 'users' => route('admin.users.index', absolute: false)],

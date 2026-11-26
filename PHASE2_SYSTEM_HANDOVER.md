@@ -1165,3 +1165,9 @@ Owner decisions: Free locks Summarize a Long Movie; each workflow has its own mi
 - `media.studio_testing` now defaults to **false** (`MEDIA_STUDIO_TESTING` unset). Before, an unset value turned the local testing bypass on, so Admin plan rules (locked workflows, minutes, 2 GB/24 h limits) were silently ignored on the owner's machine. Set `MEDIA_STUDIO_TESTING=true` only to bypass plan checks on purpose.
 - A locked workflow card in Studio is now an inviting "PAID" card: mint border and glow, mint PAID badge with crown and an "Unlock with a paid plan" line; clicking opens the upgrade dialog. My Plan uses the same mint Paid badge.
 - Local MySQL: migration `2026_11_25_120000` applied (owner auto-approval).
+
+### Permanent customer delete - 2026-11-26
+
+- Owner rule: deleting a user is a **hard delete**, so the email can be reused. The trash button in Admin → User Accounts now opens "Delete account permanently" (type the customer email to confirm, optional reason) → `DELETE /admin/users/{id}` → `CustomerAccounts::destroy()`. It removes project files (R2 + local via `MediaStorage::discard`), the profile photo, payment receipts and support attachments, then every related row (projects/runs/tasks/previews/files, usage records/events/credits, presets, payments/refunds/receipts/events, support conversations/messages/attachments/reads, admin notices, notifications, account events, plan assignments, sessions, reset tokens) and the user. Files are removed first; if storage fails nothing is deleted. Refused while a video is processing (409). Admin accounts cannot be deleted (404). Archive/restore remain in the API but are no longer offered in the row.
+- Note: admins and customers share `users.email`, so a customer cannot use an admin's email.
+- Fix: an active Top-up package crashed Admin → User Accounts (`packageOptions` read plan-only fields). Top-ups are now excluded from account plan options and from the Users/Subscriptions package filters.

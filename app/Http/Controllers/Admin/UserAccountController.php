@@ -48,7 +48,7 @@ class UserAccountController extends Controller
         $expiredQuery = User::where('is_admin', false);
         $this->filterStatus($activeQuery, 'active');
         $this->filterStatus($expiredQuery, 'expired');
-        $data = ['users' => $page->getCollection()->map(fn (User $user): array => $accounts->resource($user))->all(), 'pagination' => ['page' => $page->currentPage(), 'pages' => $page->lastPage(), 'total' => $page->total(), 'from' => $page->firstItem(), 'to' => $page->lastItem()], 'summary' => ['total' => (int) ($counts['active'] ?? 0) + (int) ($counts['suspended'] ?? 0), 'active' => $activeQuery->count(), 'suspended' => (int) ($counts['suspended'] ?? 0), 'archived' => (int) ($counts['archived'] ?? 0), 'expired' => $expiredQuery->count()], 'packageReady' => true, 'packages' => $accounts->packageOptions(), 'packageFilters' => Package::where('published_version', '>', 0)->orderBy('name')->get(['id', 'name', 'code'])->toArray(), 'mailReady' => $accounts->mailReady(), 'timezone' => config('app.timezone', 'UTC'), 'today' => now(config('app.timezone', 'UTC'))->toDateString(), 'filters' => ['package_id' => isset($packageId) ? (string) $packageId : '', 'q' => $q ?? '', 'status' => $status, 'sort' => $sort, 'per_page' => (int) ($filters['per_page'] ?? 10)], 'endpoints' => ['index' => route('admin.users.index', absolute: false), 'login' => route('login'), 'packages' => route('admin.users.package-options', absolute: false)]];
+        $data = ['users' => $page->getCollection()->map(fn (User $user): array => $accounts->resource($user))->all(), 'pagination' => ['page' => $page->currentPage(), 'pages' => $page->lastPage(), 'total' => $page->total(), 'from' => $page->firstItem(), 'to' => $page->lastItem()], 'summary' => ['total' => (int) ($counts['active'] ?? 0) + (int) ($counts['suspended'] ?? 0), 'active' => $activeQuery->count(), 'suspended' => (int) ($counts['suspended'] ?? 0), 'archived' => (int) ($counts['archived'] ?? 0), 'expired' => $expiredQuery->count()], 'packageReady' => true, 'packages' => $accounts->packageOptions(), 'packageFilters' => Package::where('published_version', '>', 0)->where('type', '!=', 'topup')->orderBy('name')->get(['id', 'name', 'code'])->toArray(), 'mailReady' => $accounts->mailReady(), 'timezone' => config('app.timezone', 'UTC'), 'today' => now(config('app.timezone', 'UTC'))->toDateString(), 'filters' => ['package_id' => isset($packageId) ? (string) $packageId : '', 'q' => $q ?? '', 'status' => $status, 'sort' => $sort, 'per_page' => (int) ($filters['per_page'] ?? 10)], 'endpoints' => ['index' => route('admin.users.index', absolute: false), 'login' => route('login'), 'packages' => route('admin.users.package-options', absolute: false)]];
 
         return $request->expectsJson() ? response()->json($data) : Inertia::render('admin/users', ['accounts' => $data]);
     }
@@ -110,6 +110,15 @@ class UserAccountController extends Controller
         $data = $request->validate(['request_id' => ['required', 'uuid'], 'revision' => ['required', 'integer', 'min:1']]);
 
         return response()->json($accounts->sendLoginInformation($request->user('admin'), $customer, $data));
+    }
+
+    /** Permanently deletes a customer and everything stored for them (the email becomes free again). */
+    public function destroy(Request $request, int $customer, CustomerAccounts $accounts): JsonResponse
+    {
+        $data = $request->validate(['revision' => ['required', 'integer', 'min:1'], 'confirm_email' => ['required', 'string', 'max:254'], 'reason' => ['nullable', 'string', 'max:500']]);
+        $accounts->destroy($request->user('admin'), $customer, $data);
+
+        return response()->json(['deleted' => true]);
     }
 
     public function action(Request $request, int $customer, CustomerAccounts $accounts): JsonResponse
