@@ -30,7 +30,8 @@ class ScheduledTasks
         'ai_usage' => ['command' => null, 'arguments' => [], 'shell' => 'php artisan ai-usage:prune', 'cron' => '15 3 * * *', 'timeout' => 1800],
     ];
 
-    public const CRON_LINE = '* * * * * cd {path} && php artisan schedule:run >> /dev/null 2>&1';
+    // Cron starts in the user's home folder, so artisan is given by its full path.
+    public const CRON_LINE = '* * * * * php {artisan} schedule:run >> /dev/null 2>&1';
 
     public const KEEP_DAYS = 30;
 
@@ -66,7 +67,7 @@ class ScheduledTasks
         $seconds = $last ? max(0, (int) CarbonImmutable::parse($last)->diffInSeconds(now())) : null;
 
         return ['state' => $last === null ? 'never' : ($seconds <= self::STALE_SECONDS ? 'running' : 'stopped'),
-            'last_tick' => $last, 'seconds_ago' => $seconds, 'cron_line' => str_replace('{path}', base_path(), self::CRON_LINE)];
+            'last_tick' => $last, 'seconds_ago' => $seconds, 'cron_line' => str_replace('{artisan}', str_replace(DIRECTORY_SEPARATOR, '/', base_path('artisan')), self::CRON_LINE)];
     }
 
     /** Runs one task now (called by the scheduler). A task that is already running is not started twice. */
@@ -195,6 +196,7 @@ class ScheduledTasks
             // Commands Admin can copy to set up or check the server (shown on the page at all times).
             'commands' => [
                 ['key' => 'cron', 'command' => $scheduler['cron_line']],
+                ['key' => 'run', 'command' => 'php artisan schedule:run'],
                 ['key' => 'local', 'command' => 'php artisan schedule:work'],
                 ['key' => 'list', 'command' => 'php artisan schedule:list'],
                 ['key' => 'worker_status', 'command' => 'supervisorctl status zatlan-worker'],

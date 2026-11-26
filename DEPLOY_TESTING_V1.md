@@ -123,7 +123,7 @@ supervisorctl start zatlan-worker
 ## 6. Scheduler (cron)
 
 ```cron
-* * * * * cd /var/www/ai_media && php artisan schedule:run >> /dev/null 2>&1
+* * * * * php /var/www/ai_media/artisan schedule:run >> /dev/null 2>&1
 ```
 
 ---

@@ -43,7 +43,7 @@ class ScheduledTasksTest extends TestCase
         $tasks->tick();
         $this->assertSame('running', $tasks->scheduler()['state']);
         $this->assertNotNull(Cache::get('media-cleanup-scheduler'));
-        $this->assertStringContainsString('php artisan schedule:run', $tasks->scheduler()['cron_line']);
+        $this->assertStringEndsWith('/artisan schedule:run >> /dev/null 2>&1', $tasks->scheduler()['cron_line']);
 
         $this->travel(10)->minutes();
         $this->assertSame('stopped', $tasks->scheduler()['state']);
