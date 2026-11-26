@@ -153,6 +153,8 @@ php artisan schedule:list
 supervisorctl status zatlan-worker
 ```
 
+Admin → Operations → **Scheduled Tasks** တွင် Scheduler (cron) နှင့် Media worker နှစ်ခုလုံး 🟢 ဖြစ်ရမည်။
+
 ---
 
 ## 9. Code update တင်တိုင်း
