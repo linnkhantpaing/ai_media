@@ -72,7 +72,9 @@ class MediaProcessingTest extends TestCase
         (new ProcessMediaRun($run->id))->handle(app(MediaPipeline::class));
         $project->refresh();
         $this->assertSame('awaiting_review', $project->status);
-        $this->assertSame('released', $usage->fresh()->status);
+        // Minutes are charged once the script is ready; the export below must not charge again.
+        $this->assertSame('charged', $usage->fresh()->status);
+        $this->assertSame((int) ceil($project->metadata['duration']), $usage->fresh()->charged_seconds);
         $this->assertCount(2, $project->lines);
         $this->assertNull($project->output_path);
         Http::assertSentCount(2);

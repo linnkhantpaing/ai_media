@@ -4,10 +4,12 @@ namespace Tests\Feature;
 
 use App\Models\User;
 use App\Notifications\CustomerWelcome;
+use App\Support\BrandedMail;
 use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class BrandedMailTest extends TestCase
@@ -37,5 +39,22 @@ class BrandedMailTest extends TestCase
         $this->assertStringContainsString(e(trans('mail.reset.title', [], 'my')), $reset->getHtmlBody());
         $welcome = $sent->first(fn ($email) => str_contains($email->getHtmlBody(), 'welcome-token'));
         $this->assertStringContainsString(e(trans('mail.welcome.action', [], 'my')), $welcome->getHtmlBody());
+    }
+
+    public function test_email_logo_follows_the_admin_main_logo_and_falls_back_to_the_built_in_one(): void
+    {
+        Storage::fake('local');
+        $this->assertSame(resource_path('brand/zatlan-logo.png'), BrandedMail::logo(null)['logoPath']);
+        $this->assertSame(resource_path('brand/zatlan-logo.png'), BrandedMail::logo('missing.png')['logoPath']);
+        $this->assertSame(resource_path('brand/zatlan-logo.png'), BrandedMail::logo('../secret.png')['logoPath']);
+
+        $image = imagecreatetruecolor(1200, 300);
+        Storage::disk('local')->makeDirectory('branding');
+        imagejpeg($image, Storage::disk('local')->path('branding/brand-logo.jpg'));
+        $logo = BrandedMail::logo('brand-logo.jpg');
+        $this->assertStringContainsString('branding', $logo['logoPath']);
+        $this->assertSame(IMAGETYPE_PNG, getimagesize($logo['logoPath'])[2]);
+        $this->assertSame(480, getimagesize($logo['logoPath'])[0]);
+        $this->assertSame([196, 49], [$logo['logoWidth'], $logo['logoHeight']]);
     }
 }

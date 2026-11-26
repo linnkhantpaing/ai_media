@@ -280,6 +280,8 @@ class PackageCatalog
             $definition['features'][$key] = (bool) $value;
         }
         $definition['watermark'] = (bool) ($data['watermark'] ?? false);
+        $definition['max_resolution'] = in_array((int) ($data['max_resolution'] ?? 0), [720, 1080], true) ? (int) $data['max_resolution'] : null;
+        $definition['preview_daily_limit'] = isset($data['preview_daily_limit']) && $data['preview_daily_limit'] !== '' ? (int) $data['preview_daily_limit'] : null;
         if (is_array($data['workflows'] ?? null)) {
             $workflows = [];
             $total = 0;

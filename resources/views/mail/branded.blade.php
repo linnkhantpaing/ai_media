@@ -32,7 +32,7 @@
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;">
 
     <tr><td align="center" style="padding:0 0 26px;">
-        <img src="{{ $logo }}" width="196" height="65" alt="{{ $brand['name'] }}" style="display:block;width:196px;max-width:60%;height:auto;border:0;outline:none;">
+        <img src="{{ $logo }}" width="{{ $logoWidth }}" height="{{ $logoHeight }}" alt="{{ $brand['name'] }}" style="display:block;width:{{ $logoWidth }}px;max-width:60%;height:auto;border:0;outline:none;">
     </td></tr>
 
     <tr><td style="border-radius:22px;background:#13111F;border:1px solid #2A2645;overflow:hidden;">

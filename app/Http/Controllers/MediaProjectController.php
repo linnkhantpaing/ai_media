@@ -427,6 +427,7 @@ class MediaProjectController extends Controller
             // Per-workflow access (included / locked / hidden), limits and remaining minutes from the Admin plan.
             'workflows' => $definition === [] ? null : app(UsageLedger::class)->workflowBalances((int) request()->user()->id, $assignment),
             'watermark' => (bool) ($definition['watermark'] ?? false),
+            'maxResolution' => in_array((int) ($definition['max_resolution'] ?? 0), [720, 1080], true) ? (int) $definition['max_resolution'] : null,
             'planActive' => app(UsageLedger::class)->hasProcessingAccess(request()->user()),
             'billingUrl' => route('account.billing', absolute: false),
             'studioDefaults' => MediaSettings::defaults((int) request()->user()->id),

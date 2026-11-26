@@ -126,8 +126,11 @@ class MediaPipeline
             ])->save();
         });
         $run->refresh();
+        // Owner rule (2026-11-26): the AI work is done once the script is ready, so its minutes are
+        // charged here. Exporting this run afterwards reuses the same usage record and is not charged
+        // again; failed or cancelled analysis is still released without a charge.
         if ($run->status === 'awaiting_review') {
-            app(UsageLedger::class)->release($run);
+            app(UsageLedger::class)->settle($run);
         }
     }
 

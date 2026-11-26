@@ -249,11 +249,11 @@ php artisan up
 
 | အချက် | အခြေအနေ |
 |---|---|
-| Analysis ပြီး export မလုပ်ခဲ့လျှင် မိနစ် မဖြတ် | AI ကုန်ကျစရိတ် ကုန်သည် — AI Costs page တွင် "Unused AI cost" ဖြင့် ကြည့်နိုင် |
-| Voice / Video preview တစ်နေ့ limit | မရှိသေး |
-| Admin က top-up payment ကိုယ်တိုင် မှတ်တမ်းတင်ခြင်း | မရှိသေး (customer ကိုယ်တိုင် ဝယ်နိုင်) |
-| Free plan 720p ကန့်သတ်ခြင်း | မရှိသေး (watermark ပါပြီး) |
-| Mail logo | System logo ကို သုံးသည် (admin upload logo မသုံးသေး) |
+| Analysis ပြီးချိန်တွင် မိနစ်ဖြတ်ခြင်း | **ပြီး** — Script ready ဖြစ်သည်နှင့် မိနစ်ဖြတ်သည်။ ထို run ကို export လုပ်လျှင် ထပ်မဖြတ်။ Fail / Cancel ဖြစ်လျှင် မဖြတ် |
+| Voice / Video preview တစ်နေ့ limit | **ပြီး** — Admin → Packages → Advanced → "Previews per day" (ဗလာ = အကန့်အသတ်မရှိ)။ ထုတ်ပြီးသား preview ပြန်ဖွင့်ခြင်း၊ fail ဖြစ်သော preview ကို မရေတွက် |
+| Admin က top-up payment ကိုယ်တိုင် မှတ်တမ်းတင်ခြင်း | မလုပ်သေး (ငွေသား လက်မခံသေး — customer ကိုယ်တိုင် ဝယ်နိုင်) |
+| Free plan 720p ကန့်သတ်ခြင်း | **ပြီး** — Admin → Packages → Advanced → "Max export resolution" (720p / 1080p / ကန့်သတ်မထား)။ Run reserve လုပ်ချိန်က plan အတိုင်း |
+| Mail logo | **ပြီး** — Admin → General Settings ရှိ Main logo အတိုင်း ပြသည် (ပြောင်းလျှင် mail တွင်လည်း ပြောင်း)။ Logo မရှိလျှင် ZATLAN logo |
 | AI ကုန်ကျငွေ | Token × သင်ထည့်ထားသော စျေးဖြင့် ခန့်မှန်းချက် — Google invoice နှင့် အနည်းငယ် ကွာနိုင် |
 
 ---

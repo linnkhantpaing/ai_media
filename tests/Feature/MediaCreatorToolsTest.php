@@ -4,11 +4,14 @@ namespace Tests\Feature;
 
 use App\Jobs\PrepareMediaPreview;
 use App\Jobs\ProcessMediaRun;
+use App\Models\CustomerPackageAssignment;
 use App\Models\MediaPreset;
 use App\Models\MediaPreview;
 use App\Models\MediaProject;
 use App\Models\MediaRun;
 use App\Models\MediaTask;
+use App\Models\Package;
+use App\Models\PackageVersion;
 use App\Models\User;
 use App\Services\Media\MediaPipeline;
 use App\Services\Media\MediaRuntime;
@@ -248,5 +251,34 @@ class MediaCreatorToolsTest extends TestCase
         Http::fake(['generativelanguage.googleapis.com/*' => function ($request) use ($audio) {
             return Http::response(['steps' => [['type' => 'model_output', 'content' => ($request['response_format']['type'] ?? '') === 'audio' ? [['type' => 'audio', 'mime_type' => 'audio/wav', 'data' => $audio]] : [['type' => 'text', 'text' => json_encode(['text' => 'Short Burmese text'])]]]]]);
         }]);
+    }
+
+    public function test_plan_daily_preview_limit_counts_new_previews_only(): void
+    {
+        Queue::fake([PrepareMediaPreview::class]);
+        config(['media.studio_testing' => false]);
+        $this->provider();
+        $project = $this->project();
+        $base = Package::factory()->make()->definition;
+        $definition = [...$base, 'preview_daily_limit' => 2, 'features' => [...$base['features'], 'video_preview' => true, 'dub' => true]];
+        $package = Package::factory()->create(['status' => 'active', 'published_version' => 1, 'definition' => $definition]);
+        $version = PackageVersion::create(['package_id' => $package->id, 'number' => 1, 'definition' => $definition]);
+        CustomerPackageAssignment::create(['user_id' => $project->user_id, 'package_id' => $package->id, 'package_version_id' => $version->id, 'source' => 'payment_new',
+            'snapshot' => ['name' => 'Plan', 'code' => $package->code, 'type' => 'paid', 'version' => 1, 'definition' => $definition], 'starts_at' => now()->subDay(), 'ends_at' => now()->addDays(20)]);
+        $url = '/media/projects/'.$project->id.'/previews';
+        $payload = ['title' => $project->title, 'settings' => [...MediaSettings::DEFAULTS, 'mode' => 'dub'], 'kind' => 'video', 'duration' => 1];
+
+        $first = $this->actingAs($project->user)->postJson($url, [...$payload, 'start' => 0])->assertAccepted()->json('preview.id');
+        MediaPreview::whereKey($first)->update(['status' => 'completed']);
+        // Reopening a ready preview returns the cached one and does not use the allowance.
+        $this->postJson($url, [...$payload, 'start' => 0])->assertOk();
+        $second = $this->postJson($url, [...$payload, 'start' => 1])->assertAccepted()->json('preview.id');
+        MediaPreview::whereKey($second)->update(['status' => 'completed']);
+        $this->postJson($url, [...$payload, 'start' => 2])->assertStatus(429)->assertJsonPath('code', 'preview_limit');
+
+        // A failed preview gives its turn back.
+        MediaPreview::whereKey($second)->update(['status' => 'failed']);
+        $this->postJson($url, [...$payload, 'start' => 2])->assertAccepted();
+        $this->assertSame(3, MediaPreview::count());
     }
 }

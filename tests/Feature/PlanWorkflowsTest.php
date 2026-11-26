@@ -245,6 +245,27 @@ class PlanWorkflowsTest extends TestCase
         $this->assertFalse(MediaRenderer::watermarked($run));
     }
 
+    public function test_free_plans_cap_export_resolution_and_limit_previews(): void
+    {
+        $this->assign($this->definition(['movie' => ['access' => 'included', 'minutes' => 60], 'translate' => ['access' => 'included', 'minutes' => 60], 'subtitles' => ['access' => 'included', 'minutes' => 30]], ['max_resolution' => 720]));
+        $this->actingAs($this->customer)->get('/projects/new')->assertOk()->assertInertia(fn (Assert $page) => $page->where('maxResolution', 720));
+        $run = $this->mediaRun(['mode' => 'subs']);
+        app(UsageLedger::class)->reserve($run);
+        $this->assertSame(720, MediaRenderer::resolutionCap($run));
+        $hd = ['width' => 1920, 'height' => 1080];
+        $this->assertSame('720p', MediaRenderer::capResolution(['quality' => 'source'], 720, $hd)['quality']);
+        $this->assertSame('720p', MediaRenderer::capResolution(['quality' => '1080p'], 720, $hd)['quality']);
+        $this->assertSame('source', MediaRenderer::capResolution(['quality' => 'source'], 720, ['width' => 640, 'height' => 360])['quality']);
+        $this->assertSame('720p', MediaRenderer::capResolution(['quality' => '720p'], 1080, $hd)['quality']);
+        $this->assertSame('source', MediaRenderer::capResolution(['quality' => 'source'], null, $hd)['quality']);
+        $response = $this->actingAs($this->admin, 'admin')->postJson('/admin/packages', $this->packagePayload(['max_resolution' => 720, 'preview_daily_limit' => 5]))->assertCreated();
+        $definition = Package::findOrFail($response->json('package.id'))->definition;
+        $this->assertSame(720, $definition['max_resolution']);
+        $this->assertSame(5, $definition['preview_daily_limit']);
+        $this->postJson('/admin/packages', $this->packagePayload(['code' => 'PKG-R', 'name' => 'R', 'request_id' => (string) Str::uuid(), 'max_resolution' => 480]))
+            ->assertUnprocessable()->assertJsonValidationErrors('max_resolution');
+    }
+
     public function test_plans_saved_before_workflow_minutes_keep_the_shared_allowance(): void
     {
         $base = Package::factory()->make()->definition;
