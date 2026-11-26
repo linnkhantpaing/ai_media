@@ -63,6 +63,15 @@ export default function ScheduledTasks({overview:initial,endpoints}:{overview:Sc
   </section>
   <p className="st-footer"><StudioIcon name="info"/>{t('footer')} {data.keep_days} {t('days')}.</p>
 
+  <details className="st-commands" open>
+   <summary><StudioIcon name="wrench"/><strong>{t('commandsTitle')}</strong><small>{t('commandsHint')}</small><StudioIcon name="chevron"/></summary>
+   <div className="st-command-groups">
+    <section><h3><StudioIcon name="clock"/>{t('cmdGroupScheduler')}</h3>{data.commands.filter(c=>['cron','local','list'].includes(c.key)).map(c=><CommandRow key={c.key} label={t('cmd_'+c.key)} hint={t('cmd_'+c.key+'_hint')} command={c.command} copied={copied==='cmd-'+c.key} copyLabel={t(copied==='cmd-'+c.key?'copied':'copy')} onCopy={()=>void copy(c.command,'cmd-'+c.key)}/>)}</section>
+    <section><h3><StudioIcon name="server"/>{t('cmdGroupWorker')}</h3>{data.commands.filter(c=>c.key.startsWith('worker_')).map(c=><CommandRow key={c.key} label={t('cmd_'+c.key)} hint={t('cmd_'+c.key+'_hint')} command={c.command} copied={copied==='cmd-'+c.key} copyLabel={t(copied==='cmd-'+c.key?'copied':'copy')} onCopy={()=>void copy(c.command,'cmd-'+c.key)}/>)}</section>
+    <section><h3><StudioIcon name="play"/>{t('cmdGroupTasks')}</h3>{data.tasks.map(task=><CommandRow key={task.key} label={t('task_'+task.key)} hint={t(scheduleWord(task.cron))} command={task.command} copied={copied==='task-'+task.key} copyLabel={t(copied==='task-'+task.key?'copied':'copy')} onCopy={()=>void copy(task.command,'task-'+task.key)}/>)}</section>
+   </div>
+  </details>
+
   <MediaDialog open={!!confirm} title={t('confirmTitle')} headerIcon="play" headerDetail={confirm?t('task_'+confirm.key):undefined} className="accounts-dialog st-confirm" animated onClose={()=>{if(!sending)setConfirm(null);}}>
    <div className="accounts-dialog-body"><p className="st-confirm-text">{t('confirmText')}</p></div>
    <footer className="accounts-dialog-footer"><button type="button" className="media-button" disabled={sending} onClick={()=>setConfirm(null)}>{t('cancel')}</button><button type="button" className="media-button primary" disabled={sending} onClick={()=>void run()}><StudioIcon name={sending?'loader':'play'} className={sending?'accounts-refresh-spin':''}/>{t('runNow')}</button></footer>
@@ -81,6 +90,10 @@ export default function ScheduledTasks({overview:initial,endpoints}:{overview:Sc
 
 function Fix({text,code,copyLabel,copied,onCopy,tone}:{text:string;code:string;copyLabel:string;copied:boolean;onCopy:()=>void;tone:'bad'|'warn'}){
  return <div className={'st-fix is-'+tone}><StudioIcon name="alert"/><div><p>{text}</p><div className="st-code"><code>{code}</code><button type="button" onClick={onCopy}><StudioIcon name={copied?'check':'copy'}/>{copyLabel}</button></div></div></div>;
+}
+
+function CommandRow({label,hint,command,copyLabel,copied,onCopy}:{label:string;hint:string;command:string;copyLabel:string;copied:boolean;onCopy:()=>void}){
+ return <div className="st-command"><div><strong>{label}</strong><small>{hint}</small></div><div className="st-code"><code>{command}</code><button type="button" onClick={onCopy} aria-label={copyLabel+': '+label}><StudioIcon name={copied?'check':'copy'}/>{copyLabel}</button></div></div>;
 }
 
 function RunRow({run,displayDate,duration}:{run:TaskRun;displayDate:(value:string,time?:boolean)=>string;duration:(ms:number|null)=>string}){

@@ -24,10 +24,10 @@ class ScheduledTasks
 {
     /** key => command (or callback), cron expression and the longest time one run may take (seconds). */
     public const TASKS = [
-        'notifications' => ['command' => 'notifications:sync', 'arguments' => [], 'cron' => '* * * * *', 'timeout' => 300],
-        'usage' => ['command' => 'usage:reconcile', 'arguments' => [], 'cron' => '*/5 * * * *', 'timeout' => 900],
-        'cleanup' => ['command' => 'media:cleanup', 'arguments' => ['--scheduled' => true], 'cron' => '0 * * * *', 'timeout' => 3600],
-        'ai_usage' => ['command' => null, 'arguments' => [], 'cron' => '15 3 * * *', 'timeout' => 1800],
+        'notifications' => ['command' => 'notifications:sync', 'arguments' => [], 'shell' => 'php artisan notifications:sync', 'cron' => '* * * * *', 'timeout' => 300],
+        'usage' => ['command' => 'usage:reconcile', 'arguments' => [], 'shell' => 'php artisan usage:reconcile', 'cron' => '*/5 * * * *', 'timeout' => 900],
+        'cleanup' => ['command' => 'media:cleanup', 'arguments' => ['--scheduled' => true], 'shell' => 'php artisan media:cleanup --scheduled', 'cron' => '0 * * * *', 'timeout' => 3600],
+        'ai_usage' => ['command' => null, 'arguments' => [], 'shell' => 'php artisan ai-usage:prune', 'cron' => '15 3 * * *', 'timeout' => 1800],
     ];
 
     public const CRON_LINE = '* * * * * cd {path} && php artisan schedule:run >> /dev/null 2>&1';
@@ -179,7 +179,7 @@ class ScheduledTasks
                 default => 'never',
             };
             $tasks[] = [
-                'key' => $key, 'cron' => $task['cron'], 'state' => $state,
+                'key' => $key, 'cron' => $task['cron'], 'state' => $state, 'command' => $task['shell'],
                 'next_run' => CarbonImmutable::instance($cron->getNextRunDate($now))->toIso8601String(),
                 'last' => $finished ? $this->present($finished) : null,
                 'current' => $latest && in_array($latest->status, ['queued', 'running'], true) ? $this->present($latest) : null,
@@ -192,6 +192,15 @@ class ScheduledTasks
         return [
             'scheduler' => $scheduler,
             'workers' => $this->workers(),
+            // Commands Admin can copy to set up or check the server (shown on the page at all times).
+            'commands' => [
+                ['key' => 'cron', 'command' => $scheduler['cron_line']],
+                ['key' => 'local', 'command' => 'php artisan schedule:work'],
+                ['key' => 'list', 'command' => 'php artisan schedule:list'],
+                ['key' => 'worker_status', 'command' => 'supervisorctl status zatlan-worker'],
+                ['key' => 'worker_restart', 'command' => 'supervisorctl restart zatlan-worker'],
+                ['key' => 'worker_run', 'command' => 'php artisan media:work'],
+            ],
             'tasks' => $tasks,
             'timezone' => $zone,
             'keep_days' => self::KEEP_DAYS,

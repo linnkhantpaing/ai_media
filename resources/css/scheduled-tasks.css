@@ -105,3 +105,27 @@
  .st-task>.st-counts{grid-column:auto}
  .st-updated{display:none}
 }
+
+/* Server commands */
+.st-commands{border:1px solid var(--border);border-radius:13px;background:linear-gradient(130deg,var(--surface-elevated),var(--surface));box-shadow:var(--shadow);overflow:hidden}
+.st-commands>summary{display:flex;align-items:center;gap:9px;padding:12px 16px;cursor:pointer;list-style:none}
+.st-commands>summary::-webkit-details-marker{display:none}
+.st-commands>summary>svg:first-child{width:16px;height:16px;color:var(--primary)}
+.st-commands>summary strong{font-size:12.5px;color:var(--text)}
+.st-commands>summary small{flex:1;min-width:0;font-size:10px;color:var(--text-muted)}
+.st-commands>summary>svg:last-child{width:14px;height:14px;color:var(--text-muted);transition:transform .2s}
+.st-commands[open]>summary>svg:last-child{transform:rotate(180deg)}
+.st-commands[open]>summary{border-bottom:1px solid var(--border);background:color-mix(in srgb,var(--primary) 5%,transparent)}
+.st-command-groups{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0}
+.st-command-groups>section{display:grid;align-content:start;gap:9px;min-width:0;padding:13px 16px}
+.st-command-groups>section+section{border-left:1px solid var(--border)}
+.st-command-groups h3{display:flex;align-items:center;gap:7px;margin:0;font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--text-muted)}
+.st-command-groups h3 svg{width:13px;height:13px;color:var(--primary)}
+.st-command{display:grid;gap:5px;min-width:0}
+.st-command>div:first-child{display:grid;gap:1px;min-width:0}
+.st-command strong{font-size:11px;color:var(--text)}
+.st-command small{font-size:9.5px;line-height:1.5;color:var(--text-muted)}
+.st-command .st-code{padding:3px 3px 3px 9px}
+.st-command .st-code code{font-size:10px}
+@media(max-width:1100px){.st-command-groups{grid-template-columns:1fr}.st-command-groups>section+section{border-left:0;border-top:1px solid var(--border)}}
+@media(max-width:600px){.st-commands>summary small{display:none}}
