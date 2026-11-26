@@ -129,7 +129,7 @@ Object.assign(words,{
 Object.assign(words,{'Not included in your plan.':['သင့် Plan တွင် မပါဝင်ပါ။','ไม่รวมอยู่ในแพ็กเกจของคุณ'],'Open Billing & Payments':['Billing & Payments ဖွင့်ရန်','เปิด Billing & Payments']});
 Object.assign(words,{'Starting with your preset':['သင့် Preset ဖြင့် စတင်နေသည်','เริ่มด้วยพรีเซ็ตของคุณ']});
 Object.assign(words,{
- 'PRO':['PRO','PRO'],
+ 'PRO':['PRO','PRO'],'Paid':['Paid','Paid'],'Unlock with a paid plan':['Paid Plan ဖြင့် ဖွင့်သုံးပါ','ปลดล็อกด้วยแพ็กเกจแบบชำระเงิน'],
  'is not included in your plan':['သည် သင့် Plan တွင် မပါဝင်ပါ','ไม่รวมอยู่ในแพ็กเกจของคุณ'],
  'Upgrade your plan to unlock this workflow and create without limits.':['ဤ workflow ကို သုံးရန် Plan ကို Upgrade လုပ်ပါ။','อัปเกรดแพ็กเกจเพื่อปลดล็อกเวิร์กโฟลว์นี้'],
  'Upgrade your plan for longer recaps.':['Recap ပိုရှည်ရှည် ထုတ်ရန် Plan ကို Upgrade လုပ်ပါ။','อัปเกรดแพ็กเกจเพื่อสรุปที่ยาวขึ้น'],

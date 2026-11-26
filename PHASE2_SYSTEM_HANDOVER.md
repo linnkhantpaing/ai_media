@@ -1159,3 +1159,9 @@ Owner decisions: Free locks Summarize a Long Movie; each workflow has its own mi
 - **UI**: Admin package form has Free Trial / Paid / Top-up types, a "Workflows & Minutes" card per workflow (Included/Locked/Hidden, minutes, max source, max recap) with a read-only total, and a watermark switch. Studio hides hidden workflows, shows locked ones with a PRO badge that opens an upgrade dialog, locks recap lengths above the cap, shows "N min left this period · Buy minutes", and the allowance notice turns amber with a Buy minutes link when the video does not fit (also fixed its broken "?" separator). My Plan shows minutes by workflow (with top-ups) and a watermark notice. Dashboard Quick Start hides hidden workflows and locks locked ones. Revenue filter accepts `topup`.
 - Local testing mode (`StudioTesting`, local env with `MEDIA_STUDIO_TESTING` not false) still bypasses all plan checks and plan UI; set `MEDIA_STUDIO_TESTING=false` to see and test the plan rules locally.
 - Migration `2026_11_25_120000_add_workflow_allowances_and_usage_credits` (additive). Tests: `PlanWorkflowsTest`. Browser QA (isolated SQLite, testing mode off): en/my/th at 1440 and 390 for Studio, upgrade dialog, My Plan, Billing top-ups and the Admin form.
+
+### Plan rules apply locally by default; Paid workflow card - 2026-11-26
+
+- `media.studio_testing` now defaults to **false** (`MEDIA_STUDIO_TESTING` unset). Before, an unset value turned the local testing bypass on, so Admin plan rules (locked workflows, minutes, 2 GB/24 h limits) were silently ignored on the owner's machine. Set `MEDIA_STUDIO_TESTING=true` only to bypass plan checks on purpose.
+- A locked workflow card in Studio is now an inviting "PAID" card: mint border and glow, mint PAID badge with crown and an "Unlock with a paid plan" line; clicking opens the upgrade dialog. My Plan uses the same mint Paid badge.
+- Local MySQL: migration `2026_11_25_120000` applied (owner auto-approval).

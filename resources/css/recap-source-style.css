@@ -142,3 +142,15 @@
 .processing-allowance-buy{display:inline-flex;align-items:center;gap:5px;margin-top:4px;color:var(--primary);font-weight:700;font-size:11px;text-decoration:none}
 .processing-allowance-buy svg{width:12px;height:12px}
 @media(max-width:600px){.source-minutes-left{width:100%;margin-right:0}.source-next-row>button{margin-left:auto}}
+/* Paid-only workflow: inviting, not disabled-looking */
+.source-output-choices button.is-locked{opacity:1;border:1px solid color-mix(in srgb,var(--mint) 45%,transparent);background:linear-gradient(160deg,color-mix(in srgb,var(--mint) 12%,transparent),transparent 70%);box-shadow:0 0 0 1px color-mix(in srgb,var(--mint) 10%,transparent),0 8px 26px color-mix(in srgb,var(--mint) 14%,transparent)}
+.source-output-choices button.is-locked>svg:first-child{opacity:1;color:var(--mint)}
+.source-output-choices button.is-locked>strong{opacity:1;color:var(--text)}
+.source-output-choices button.is-locked:hover{transform:translateY(-1px);border-color:var(--mint);box-shadow:0 0 0 1px color-mix(in srgb,var(--mint) 30%,transparent),0 10px 30px color-mix(in srgb,var(--mint) 24%,transparent)}
+.source-pro-badge{color:#062A20;background:linear-gradient(135deg,#9CF5D7,#72E2C3 55%,#3FCFA6);box-shadow:0 0 12px color-mix(in srgb,var(--mint) 55%,transparent);letter-spacing:.6px;text-transform:uppercase;padding:3px 8px}
+.source-pro-badge svg{width:10px;height:10px}
+.source-paid-hint{display:inline-flex;align-items:center;gap:4px;margin-top:2px;font-size:10px;font-weight:700;color:var(--mint);text-shadow:0 0 10px color-mix(in srgb,var(--mint) 40%,transparent)}
+.source-paid-hint svg{width:11px;height:11px}
+.source-duration-choices button.is-locked{opacity:.8;border-color:color-mix(in srgb,var(--mint) 30%,transparent)}
+.source-duration-choices button.is-locked svg{color:var(--mint)}
+@media(max-width:600px){.source-output-choices button.is-locked{padding-top:28px}.source-pro-badge{top:6px;right:6px;padding:2px 6px;font-size:8px}.source-paid-hint{font-size:9px;line-height:1.5;text-align:center}.source-paid-hint svg{display:none}}

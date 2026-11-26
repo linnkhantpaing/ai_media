@@ -97,7 +97,7 @@ html:has(.plan-dialog[open]){overflow:hidden}
 .plan-workflow.is-locked{opacity:.85}
 .plan-workflow-head{display:flex;align-items:center;gap:9px;min-width:0}.plan-workflow-head strong{font-size:11.5px;min-width:0;flex:1;line-height:1.6}
 .plan-workflow-icon{width:30px;height:30px;border-radius:10px;display:grid;place-items:center;flex-shrink:0;color:var(--primary);background:color-mix(in srgb,var(--primary) 13%,transparent)}.plan-workflow-icon svg{width:15px!important;height:15px!important}
-.plan-pro-badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:20px;font-size:9px;font-weight:800;letter-spacing:.5px;color:#1A1300;background:linear-gradient(135deg,#F5C66A,#E6A23C)}.plan-pro-badge svg{width:10px!important;height:10px!important}
+.plan-pro-badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:20px;font-size:9px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:#062A20;background:linear-gradient(135deg,#9CF5D7,#72E2C3 55%,#3FCFA6);box-shadow:0 0 10px color-mix(in srgb,var(--mint) 45%,transparent)}.plan-pro-badge svg{width:10px!important;height:10px!important}
 .plan-workflow .plan-available{margin:0}.plan-workflow .plan-available strong{font-size:17px}
 .plan-workflow dl{display:flex;flex-wrap:wrap;gap:4px 16px;margin:0}.plan-workflow dl div{display:flex;gap:6px;font-size:10px}.plan-workflow dt{color:var(--text-muted)}.plan-workflow dd{margin:0;font-weight:650}
 .plan-workflow-foot{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;margin-top:auto;font-size:10px;color:var(--text-secondary)}.plan-workflow-foot .plan-link{margin-left:auto;font-size:10.5px}.plan-workflow-foot .plan-link svg{width:13px!important;height:13px!important}

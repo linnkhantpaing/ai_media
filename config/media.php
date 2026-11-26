@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'studio_testing' => (bool) env('MEDIA_STUDIO_TESTING', true),
+    'studio_testing' => (bool) env('MEDIA_STUDIO_TESTING', false),
     'storage_limit_bytes' => (int) env('MEDIA_STORAGE_LIMIT_BYTES', 4294967296),
     'max_upload_bytes' => (int) env('MEDIA_MAX_UPLOAD_BYTES', 2147483648),
     'max_duration_seconds' => (int) env('MEDIA_MAX_DURATION_SECONDS', 600),
