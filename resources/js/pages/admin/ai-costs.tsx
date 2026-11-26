@@ -72,7 +72,7 @@ export default function AiCosts({ report: initial, filters: initialFilters, pric
     const maxStage = Math.max(1, ...report.stages.map(stageValue));
     const stageWord = (key: string) => t((key === 'translate' ? 'translate_stage' : key) as AiCostWord);
     const wastedShare = s.ai_mmk > 0 ? Math.round((s.wasted_mmk / s.ai_mmk) * 100) + '%' : '0%';
-    const stat = (key: string, icon: IconName, label: string, value: string, hint: string, tone = '') => <article className={'pr-stat ac-stat ' + tone} key={key}><span className="pr-stat-icon"><StudioIcon name={icon} /></span><div><h2>{label}</h2><strong>{value}</strong><small>{hint}</small></div></article>;
+    const stat = (key: string, icon: IconName, label: string, value: string, hint: string, tone = 'is-iris') => <article className={'ac-kpi ' + tone} key={key}><header><span className="ac-kpi-icon"><StudioIcon name={icon} /></span><h2>{label}</h2></header><strong title={value}>{value}</strong><small>{hint}</small></article>;
 
     return <AppLayout area="admin" frame="preferences" adminPage="aiCosts" breadcrumbLabel={t('title')}><Head title={t('title')} /><section className="rv-page pr-page ac-page">
         <header className="rv-page-heading"><div className="rv-title"><span className="rv-title-icon"><StudioIcon name="wallet" /></span><div><h1>{t('title')}</h1><p>{t('subtitle')}</p></div></div>
@@ -87,13 +87,13 @@ export default function AiCosts({ report: initial, filters: initialFilters, pric
         {(!report.pricing.configured || report.pricing.rates_missing) && <p className="ac-notice is-warn"><StudioIcon name="alert" /><span>{t('setPrices')}</span><button type="button" className="media-button" onClick={() => setPricesOpen(true)}>{t('prices')}</button></p>}
         {report.pricing.configured && !report.pricing.rates_missing && report.pricing.missing_models.length > 0 && <p className="ac-notice"><StudioIcon name="info" /><span>{t('missingModels', { models: report.pricing.missing_models.join(', ') })}</span><button type="button" className="media-button" onClick={() => setPricesOpen(true)}>{t('prices')}</button></p>}
 
-        <div className={'pr-stats ac-stats' + (busy ? ' is-loading' : '')}>
+        <div className={'ac-kpis' + (busy ? ' is-loading' : '')}>
             {stat('tokens', 'bolt', t('tokens'), count(s.total_tokens), t('inOut', { input: count(s.input_tokens), output: count(s.output_tokens) }))}
-            {stat('ai', 'sparkles', t('aiCost'), mmk(s.ai_mmk), s.check_mmk > 0 ? t('calls', { count: count(s.calls) }) + ' · ' + t('checkCost', { amount: mmk(s.check_mmk) }) : t('calls', { count: count(s.calls) }))}
-            {stat('storage', 'database', t('storage'), formatBytes(s.storage_bytes), t('storageChange', { added: formatBytes(s.storage_added), removed: formatBytes(s.storage_removed) }))}
-            {stat('storageCost', 'layers', t('storageCost'), mmk(s.storage_mmk), t('perGb', { price: pricing.storage_gb_month }))}
-            {stat('wasted', 'alert', t('wasted'), mmk(s.wasted_mmk), t('wastedHint', { share: wastedShare }), s.wasted_mmk > 0 ? 'is-warn' : '')}
-            {stat('profit', 'chart', t('profit'), mmk(s.profit_mmk), t('revenueHint', { revenue: mmk(s.revenue_mmk) }), s.profit_mmk < 0 ? 'is-bad' : 'is-good')}
+            {stat('ai', 'sparkles', t('aiCost'), mmk(s.ai_mmk), s.check_mmk > 0 ? t('calls', { count: count(s.calls) }) + ' · ' + t('checkCost', { amount: mmk(s.check_mmk) }) : t('calls', { count: count(s.calls) }), 'is-violet')}
+            {stat('storage', 'database', t('storage'), formatBytes(s.storage_bytes), t('storageChange', { added: formatBytes(s.storage_added), removed: formatBytes(s.storage_removed) }), 'is-sky')}
+            {stat('storageCost', 'layers', t('storageCost'), mmk(s.storage_mmk), t('perGb', { price: pricing.storage_gb_month }), 'is-teal')}
+            {stat('wasted', 'alert', t('wasted'), mmk(s.wasted_mmk), t('wastedHint', { share: wastedShare }), 'is-amber')}
+            {stat('profit', 'chart', t('profit'), mmk(s.profit_mmk), t('revenueHint', { revenue: mmk(s.revenue_mmk) }), s.profit_mmk < 0 ? 'is-red' : 'is-mint')}
         </div>
 
         <div className="ac-charts">
