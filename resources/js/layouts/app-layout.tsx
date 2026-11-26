@@ -114,10 +114,10 @@ function PlanFooter({ badge, href, onNavigate }: { badge: NonNullable<SharedData
     return <Link href={href} className={'studio-footer-row studio-plan-footer is-' + state} title={t('sf_storage') + ' · ' + size(used) + (total ? ' / ' + size(total) : '') + ' · ' + chip + ' · ' + time} onClick={onNavigate}>
         <span className="studio-footer-icon"><StudioIcon name="database" /></span>
         <div className="spf-body">
-            <div className="spf-head"><StudioIcon name="database" /><strong>{t('sf_storage')}</strong><em className={'spf-plan is-' + (badge.type === 'trial' ? 'free' : state)} title={chip}>{badge.type !== 'trial' && badge.status !== 'none' && <StudioIcon name="crown" />}{chip}</em></div>
-            <div className="spf-usage"><b>{size(used)}</b>{total !== null && <><span>/ {size(total)}</span><small>{number(share, share < 10 ? 2 : 1)}%</small></>}</div>
+            <div className="spf-head"><StudioIcon name="database" /><span className="spf-usage"><b>{size(used)}</b>{total !== null && <> / {size(total)}<small> · {number(share, share < 10 ? 2 : 1)}%</small></>}</span><em className={'spf-plan is-' + (badge.type === 'trial' ? 'free' : state)} title={chip}>{badge.type !== 'trial' && badge.status !== 'none' && <StudioIcon name="crown" />}{chip}</em></div>
             {total !== null && <i className={'spf-bar ' + tone} role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(share)} aria-label={t('sf_storage')}><b style={{ width: Math.max(share, used > 0 ? 2 : 0) + '%' }} /></i>}
             <div className="spf-meta">{total !== null && <span>{share >= 100 ? t('sf_full') : t('sf_left', { size: size(Math.max(0, total - used)) })}</span>}<span className={'spf-time is-' + state + (badge.status === 'active' && badge.days_left <= 3 ? ' is-soon' : '')}><StudioIcon name="clock" />{time}{date && <> · {date}</>}</span></div>
+            <small className="spf-version">{t('sf_version')}</small>
         </div>
     </Link>;
 }
