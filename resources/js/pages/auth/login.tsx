@@ -2,6 +2,7 @@ import { Head, Link, useForm, usePage } from '@inertiajs/react';
 import { useRef, type FormEvent } from 'react';
 import { AuthIcon } from '@/components/auth-icon';
 import { EmailField, PasswordField } from '@/components/auth-fields';
+import { InstallAppLink } from '@/components/install-app-guide';
 import CinematicLoginLayout from '@/layouts/cinematic-login-layout';
 import { useTranslations } from '@/lib/i18n';
 import type { SharedData } from '@/types';
@@ -35,5 +36,6 @@ export default function Login({ status }: { status?: 'password_updated' | null }
                 {processing ? <><span className="auth-spinner" aria-hidden="true" />{t('signingIn')}</> : <>{t('signIn')}<AuthIcon name="arrow-right" /></>}
             </button>
         </form>
+        <InstallAppLink />
     </CinematicLoginLayout>;
 }
