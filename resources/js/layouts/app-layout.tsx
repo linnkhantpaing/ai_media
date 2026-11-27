@@ -8,6 +8,7 @@ import { LocaleSwitcher } from '@/components/locale-switcher';
 import {PlatformNotice,PlatformSupport} from '@/components/platform-notice';
 import { BrandLogo } from '@/components/brand-logo';
 import { StudioIcon } from '@/components/studio-icon';
+import { InstallAppEntry } from '@/components/install-app-guide';
 import { StudioBreadcrumb } from '@/components/studio-breadcrumb';
 import {CustomerQueue} from '@/components/customer-queue';
 import {CustomerSupport} from '@/components/customer-support';
@@ -86,6 +87,7 @@ function Sidebar({ frame, mobile = false, adminArea = false, adminPage = 'dashbo
                 })}
             </div>
         </nav>}
+        {!adminArea && auth.user && <div className="studio-sidebar-install"><InstallAppEntry /></div>}
         {!adminArea && planBadge ? <div className="studio-sidebar-footer"><PlanFooter badge={planBadge} href={frameLinks.myPlan ?? links.workspace} onNavigate={onNavigate} /></div> : <div className="studio-sidebar-footer">
             <div className="studio-footer-row" title={footerTitle}>
                 <span className="studio-footer-icon"><StudioIcon name="shield" /></span>

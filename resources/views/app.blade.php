@@ -5,7 +5,14 @@
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="theme-color" content="#0B0D14">
         <meta name="description" content="{{ request()->attributes->get('platform_settings')['tagline'] ?? 'AI Video Recap Studio' }}">
-        <link rel="icon" href="{{ request()->attributes->get('platform_settings')['favicon'] ?? asset('favicon.svg') }}">
+        @php($favicon = request()->attributes->get('platform_settings')['favicon'] ?? asset('favicon.svg'))
+        <link rel="icon" href="{{ $favicon }}">
+        {{-- Home-screen shortcut icon (iPhone / Android): the favicon saved in General Settings when it is a PNG. --}}
+        @if (str_ends_with(strtolower($favicon), '.png'))
+            <link rel="apple-touch-icon" href="{{ $favicon }}">
+            <link rel="icon" type="image/png" sizes="192x192" href="{{ $favicon }}">
+        @endif
+        <meta name="apple-mobile-web-app-title" content="{{ request()->attributes->get('platform_settings')['name'] ?? config('app.name') }}">
         <title inertia>{{ config('app.name', 'AI Media') }}</title>
         <script nonce="{{ Vite::cspNonce() }}">
             (() => {

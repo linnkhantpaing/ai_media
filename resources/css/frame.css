@@ -320,3 +320,4 @@ html[lang="my"] .studio-nav-link { line-height: 2; }
 .sidebar-is-collapsed .studio-sidebar .studio-sidebar-footer:has(.studio-plan-footer) { padding: 10px 6px; }
 .spf-head .spf-usage{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.spf-head .spf-usage small{white-space:nowrap}
 .studio-plan-footer .spf-head .spf-usage small{display:inline}
+.studio-sidebar-install{flex-shrink:0;padding:10px 12px 0;border-top:1px solid var(--border)}.studio-sidebar-install+.studio-sidebar-footer{border-top:0}.studio-sidebar-install .ia-entry{margin-bottom:0}.sidebar-is-collapsed .studio-sidebar .studio-sidebar-install{padding:8px 6px 0}
